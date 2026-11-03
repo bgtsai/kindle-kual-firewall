@@ -1,12 +1,14 @@
-# 推送到 main 且 firewall/ 有變動時：讀 config.xml 的 <version>，
+# 推送到 main 且 kindle/ 有變動時：讀 config.xml 的 <version>，
 # 該版本還沒有 Release 就打包 firewall.zip 並發布 v{version}。
+# zip 內容＝kindle/ 底下的東西（extensions/firewall/ 與 WIFI_NO_NET_PROBE），
+# 使用者解壓後整包放進 Kindle 根目錄即可。
 # 為什麼用 Actions：Claude 雲端環境不能建 tag／Release（見知識庫 27 第 9 條）。
 name: Release
 
 on:
   push:
     branches: [main]
-    paths: ['firewall/**']
+    paths: ['kindle/**']
   workflow_dispatch:
 
 permissions:
@@ -21,8 +23,8 @@ jobs:
       - name: Read version
         id: ver
         run: |
-          v=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' firewall/config.xml | head -1)
-          [ -n "$v" ] || { echo "version not found in firewall/config.xml"; exit 1; }
+          v=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' kindle/extensions/firewall/config.xml | head -1)
+          [ -n "$v" ] || { echo "version not found in kindle/extensions/firewall/config.xml"; exit 1; }
           echo "tag=v$v" >> "$GITHUB_OUTPUT"
 
       - name: Skip if release exists
@@ -38,8 +40,8 @@ jobs:
       - name: Build zip
         if: steps.check.outputs.exists != '1'
         run: |
-          chmod 755 firewall/bin/*.sh
-          zip -r firewall.zip firewall
+          chmod 755 kindle/extensions/firewall/bin/*.sh
+          cd kindle && zip -r ../firewall.zip extensions WIFI_NO_NET_PROBE
 
       - name: Create release
         if: steps.check.outputs.exists != '1'
@@ -48,4 +50,4 @@ jobs:
         run: |
           gh release create "${{ steps.ver.outputs.tag }}" firewall.zip \
             --title "firewall ${{ steps.ver.outputs.tag }}" \
-            --notes "Download **firewall.zip**, unzip it, and copy the \`firewall\` folder into \`extensions/\` on your Kindle. See README for details."
+            --notes "Download **firewall.zip**, unzip it, and copy everything inside (\`extensions\` folder + \`WIFI_NO_NET_PROBE\` file) to the root of your Kindle drive. **Reboot the Kindle afterwards.** See README for details."

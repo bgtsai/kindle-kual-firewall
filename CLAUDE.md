@@ -4,21 +4,26 @@ This repo is a KUAL extension for jailbroken Kindles. Users usually come with **
 
 ## Layout
 
+`kindle/` mirrors the root of the Kindle drive; `firewall.zip` is exactly its contents.
+
 ```
-firewall/                 ← the extension; folder name must equal <id> in config.xml
-├── config.xml            KUAL metadata (<information> + <menus>); bump <version> on every change
-├── menu.json             one top-level "Firewall" item; all actions in its "items" submenu
-└── bin/
-    ├── common.sh         shared paths, ALLOW_DOMAINS, resolve_ipv4(), log(), notify()
-    ├── enable.sh         base rules now, GitHub allowed later by a background retry loop
-    ├── disable.sh        stop retry loop, flush OUTPUT, policy ACCEPT
-    ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
-    ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
-    └── diagnose.sh       read-only; writes firewall/diagnose.txt
-.github/workflows/release.yml   on push to main touching firewall/**: builds firewall.zip, releases v<version> (skips if exists)
+kindle/
+├── WIFI_NO_NET_PROBE     empty flag file; wifid reads /mnt/us/WIFI_NO_NET_PROBE at start → runs with -n (no connectivity probe)
+└── extensions/
+    └── firewall/             ← the extension; folder name must equal <id> in config.xml
+        ├── config.xml            KUAL metadata (<information> + <menus>); bump <version> on every change
+        ├── menu.json             one top-level "Firewall" item; all actions in its "items" submenu
+        └── bin/
+            ├── common.sh         shared paths, ALLOW_DOMAINS, resolve_ipv4(), log(), notify()
+            ├── enable.sh         base rules now, GitHub allowed later by a background retry loop
+            ├── disable.sh        stop retry loop, flush OUTPUT, policy ACCEPT
+            ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
+            ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
+            └── diagnose.sh       read-only; writes firewall/diagnose.txt
+.github/workflows/release.yml   on push to main touching kindle/**: zips kindle/ contents into firewall.zip, releases v<version> (skips if exists)
 ```
 
-Always deliver the result as `firewall.zip` whose top level is the `firewall/` folder (users copy it to `extensions/firewall/`).
+Always deliver the result as `firewall.zip` whose top level is `extensions/` + `WIFI_NO_NET_PROBE` (users copy both to the Kindle drive root, then reboot).
 
 ## Model-specific parts — check these against the user's diagnose.txt
 
@@ -29,6 +34,7 @@ Always deliver the result as `firewall.zip` whose top level is the `firewall/` f
 | conntrack vs state | `enable.sh` | `conntrack / state modules`. Code already falls back from conntrack to state. |
 | IPv6 | not implemented | `tools`: if `ip6tables` exists and `IPv6 addresses` is non-empty, add equivalent ip6tables rules (tested device had neither). |
 | Root fs read-only | `autostart_*.sh` | `mounts`: `/dev/root on / ... (ro,...)` → `mntroot rw/ro` needed. Check `mntroot` exists in `tools`. |
+| Wi-Fi connectivity probe | `kindle/WIFI_NO_NET_PROBE` | Kindle probes `spectrum.s3.amazonaws.com/kindle-wifi/wifistub.html` after joining Wi-Fi; the firewall blocks it → Wi-Fi error. The flag file disables the probe (confirmed on 5.13.5; read only when wifid starts → reboot needed). If the user's Kindle ignores the flag, look for how `wifid.conf` builds its arguments. Do **not** solve it by allowing S3 IPs: firmware updates are also on S3. |
 | LAN range | `enable.sh` | User's network may be `10.0.0.0/8` or `172.16.0.0/12` instead of `192.168.0.0/16`. Ask. |
 
 Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptables` at `/usr/sbin/iptables`, no `ip6tables`.
@@ -42,8 +48,8 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 
 ## After editing
 
-1. `sh -n` every script in `firewall/bin/`.
-2. Validate `menu.json` (JSON) and `config.xml` (XML).
+1. `sh -n` every script in `kindle/extensions/firewall/bin/`.
+2. Validate `menu.json` (JSON) and `config.xml` (XML). Keep `kindle/WIFI_NO_NET_PROBE` present (empty).
 3. Bump `<version>` in `config.xml` and the `vX.Y` in each changed script's header comment.
 4. If you changed `enable.sh` logic, test it with stub `iptables`/`nslookup` scripts on PATH (simulate DNS failing a few times, then succeeding).
 5. Grep for leftover old names/paths if you renamed anything (folder name, `/etc/upstart/firewall.conf`, `firewall.log`).

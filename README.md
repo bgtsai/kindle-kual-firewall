@@ -10,7 +10,7 @@ A KUAL extension for jailbroken Kindles. It blocks all outbound internet traffic
 
 It can also start automatically on boot, so the firewall is active before Wi-Fi and the OTA service start.
 
-> **Tested on:** Kindle firmware 5.13.5 (kernel 4.1.15). Other models may need adjustments — see [Customizing for your Kindle with AI](#customizing-for-your-kindle-with-ai).
+> **Tested on:** Kindle firmware 5.13.5 (kernel 4.1.15), including Wi-Fi connecting with the firewall on. Other models may need adjustments — see [Customizing for your Kindle with AI](#customizing-for-your-kindle-with-ai).
 
 ## Requirements
 
@@ -21,16 +21,30 @@ It can also start automatically on boot, so the firewall is active before Wi-Fi 
 ## Installation
 
 1. Go to [Releases](../../releases/latest) and download **`firewall.zip`**.
-   (Do not use GitHub's green "Code → Download ZIP" button — it adds an extra folder level.)
-2. Unzip it. You get a folder named `firewall`.
+   (Do not use GitHub's green "Code → Download ZIP" button — that is the source code, with a different folder layout.)
+2. Unzip it. Inside you get **two things**: an `extensions` folder and a file named `WIFI_NO_NET_PROBE`.
 3. Connect the Kindle to your computer with USB. The Kindle shows up as a drive.
-4. Copy the **whole `firewall` folder** into the `extensions` folder on that drive.
-5. Eject the Kindle, open KUAL. You should see a **Firewall** entry.
+4. Copy **both** of them to the **root** of that drive (the top level, where the `documents` folder is). If the drive already has an `extensions` folder, let your computer **merge** them — your other extensions stay untouched.
+5. Eject the Kindle and **reboot it** (see below why this is required).
+6. Open KUAL. You should see a **Firewall** entry.
 
-### The folder structure must look exactly like this
+### A reboot is required after installing
+
+Most KUAL extensions work right away without a reboot. This one is different because of `WIFI_NO_NET_PROBE`:
+
+- After joining a Wi-Fi network, the Kindle normally tries to download a test page from Amazon (`spectrum.s3.amazonaws.com`) to check that the internet works. **The firewall blocks that page, so without `WIFI_NO_NET_PROBE` the Kindle shows a Wi-Fi error and refuses to connect.**
+- `WIFI_NO_NET_PROBE` is an empty file that tells the Kindle's Wi-Fi service to skip that check. The Wi-Fi service only looks for it **when it starts**, i.e. at boot.
+
+So: copy the files → reboot → then enable the firewall and connect to Wi-Fi.
+
+Why not just allow the test page? It is hosted on Amazon S3, and so are the firmware update files. The firewall works by IP address and can't tell the two apart, so allowing the test page could also let firmware updates through.
+
+### The structure on the Kindle must look exactly like this
 
 ```
 Kindle drive (root)
+├── WIFI_NO_NET_PROBE          ← empty file, no extension (not .txt)
+├── documents/                 (already there)
 └── extensions/
     └── firewall/              ← this folder name must stay "firewall"
         ├── config.xml
@@ -48,9 +62,11 @@ Common mistakes:
 
 | Wrong | Why it fails |
 | --- | --- |
-| `extensions/firewall/firewall/config.xml` | One folder level too deep — KUAL won't find it. Happens when unzipping into a folder that is already named `firewall`. |
-| `extensions/firewall-main/...` | Folder renamed by GitHub's "Download ZIP". The folder name must match the `<id>` in `config.xml` (`firewall`). |
-| `config.xml` directly inside `extensions/` | Every extension needs its own folder. |
+| `firewall/extensions/firewall/...` on the Kindle | Your unzip tool created an extra folder named after the zip. Copy what is **inside** it to the Kindle root. |
+| `extensions/firewall/firewall/config.xml` | One folder level too deep — KUAL won't find it. |
+| `WIFI_NO_NET_PROBE.txt` | Windows may hide or add a `.txt` extension. The file name must be exactly `WIFI_NO_NET_PROBE`. Turn on "File name extensions" in Explorer to check. |
+| `WIFI_NO_NET_PROBE` inside `extensions/` | It must be at the drive root, next to `extensions/`. |
+| Didn't reboot | The Wi-Fi check is still on → Wi-Fi error while the firewall is enabled. |
 
 ## Menu
 
@@ -93,6 +109,8 @@ Everything else outbound is dropped.
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
 | `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
 
+`WIFI_NO_NET_PROBE` at the drive root is not created by the extension — it comes in the zip (see [Installation](#installation)).
+
 ### Checking that it works
 
 1. Firewall ▸ **Enable Firewall**, then turn Wi-Fi on.
@@ -112,6 +130,7 @@ If "GitHub 放行完成" never appears, the Kindle couldn't look up GitHub — u
 - **Without Autostart, rules are lost on reboot.** Press Enable again, or use Install Autostart.
 - **GitHub IPs can change.** If KOReader updates start failing days later, press Enable again.
 - **IPv4 only.** The tested Kindle has no IPv6 (`ip6tables` not present), so IPv6 is not handled.
+- **Wi-Fi error while the firewall is on** → `WIFI_NO_NET_PROBE` is missing, misnamed, or the Kindle wasn't rebooted after adding it. See [A reboot is required](#a-reboot-is-required-after-installing).
 - **Firmware updates remove Autostart**, since they overwrite the system partition (but the firewall's purpose is to block those updates).
 - If an Autostart mistake ever stops the Kindle from booting normally, delete `/etc/upstart/firewall.conf` over SSH. The boot job is written to do nothing if the extension folder is missing.
 
@@ -120,6 +139,7 @@ If "GitHub 放行完成" never appears, the Kindle couldn't look up GitHub — u
 1. Firewall ▸ **Remove Autostart** (if you installed it).
 2. Firewall ▸ **Disable Firewall**.
 3. Delete `extensions/firewall` over USB.
+4. Delete `WIFI_NO_NET_PROBE` from the drive root and reboot, so the Kindle checks the internet connection normally again. (Optional — keeping it does no harm.)
 
 ## Customizing for your Kindle with AI
 
@@ -138,7 +158,7 @@ The boot timing (`starting lab126`) and some other details were chosen based on 
 
 Start a **new** conversation and attach:
 
-1. `firewall.zip` (the original release file)
+1. `firewall.zip` (the original release file — it contains `extensions/firewall/` and `WIFI_NO_NET_PROBE`)
 2. your `diagnose.txt`
 
 Then paste this message (edit the last part):
@@ -154,18 +174,29 @@ Please read CLAUDE.md in the repo (or the "Notes for AI" section of the README) 
 - "firewall.log": did GitHub get allowed after Enable?
 - "mounts": is the root filesystem read-only (needs mntroot rw)?
 
-Tell me what needs to change for my Kindle and why, before changing anything. Then give me a new firewall.zip with the same folder structure (extensions/firewall/...) and bump the version in config.xml.
+Tell me what needs to change for my Kindle and why, before changing anything. Then give me a new firewall.zip with the same structure (extensions/firewall/... plus WIFI_NO_NET_PROBE at the top level) and bump the version in config.xml.
 
 My changes: <describe what you want, e.g. "my home network is 10.0.0.x", or "nothing extra, just make it work on my Kindle">
 ```
 
 ### Step 3 — Install the result
 
-Replace `extensions/firewall` on your Kindle with the new folder, then run through [Checking that it works](#checking-that-it-works) again. If you used Autostart before and the AI changed the boot job, press **Remove Autostart** with the old version first, then **Install Autostart** with the new one.
+Replace `extensions/firewall` on your Kindle with the new folder (keep `WIFI_NO_NET_PROBE` at the root), reboot if anything about Wi-Fi changed, then run through [Checking that it works](#checking-that-it-works) again. If you used Autostart before and the AI changed the boot job, press **Remove Autostart** with the old version first, then **Install Autostart** with the new one.
 
 ## Notes for AI
 
 See [CLAUDE.md](CLAUDE.md) — it lists which parts are model-specific and what to check after editing.
+
+## References
+
+Sources used while designing this extension:
+
+- Wi-Fi connectivity check (`spectrum.s3.amazonaws.com/kindle-wifi/wifistub.html`) and that the Kindle won't join a network when it fails: [MobileRead – wifistub connectivity check](https://www.mobileread.com/forums/showthread.php?p=2874926), [MobileRead – Kindle Touch phoning home when first connecting to a WiFi network](https://www.mobileread.com/forums/showthread.php?p=2962466)
+- `WIFI_NO_NET_PROBE` flag file (`/mnt/us/WIFI_NO_NET_PROBE` → `wifid -n`): [MobileRead – Kindle Touch phoning home…](https://www.mobileread.com/forums/showthread.php?p=2962466), [Kindle联网问题分析 (heary.cn)](https://heary.cn/posts/Kindle%E8%81%94%E7%BD%91%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90/)
+- Firmware update files are hosted on Amazon S3: [KindleModding – Manually Downloading Firmware Update Files](https://kindlemodding.org/firmware-and-flashing/downloading-updates.html)
+- KUAL extension `config.xml` / `menu.json` format: [Kindle + Python = e-Ink Dashboard (4DCu.be)](https://blog.4dcu.be/diy/2020/09/27/PythonKindleDashboard_1.html), [MobileRead Wiki – KUAL](https://wiki.mobileread.com/wiki/KUAL)
+- Alternative OTA blocking by renaming the update binaries (not used here): [GitHub – Darthagnon/BlockKindleOTA](https://github.com/Darthagnon/BlockKindleOTA), [MobileRead – OTA blocking on recent firmware](https://www.mobileread.com/forums/showthread.php?p=4329911)
+- Amazon's own Wi-Fi troubleshooting page: [Resolve Wi-Fi Connection Issues on Your Kindle E-Reader](https://digprjsurvey.amazon.com/csad/help/node/G5HYWUVWRXFSCH7E)
 
 ## License
 
