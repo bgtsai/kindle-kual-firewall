@@ -6,7 +6,7 @@ A KUAL extension for jailbroken Kindles. It blocks all outbound internet traffic
 
 - your local network (`192.168.x.x`)
 - DNS lookups
-- HTTPS to GitHub (so KOReader can still update itself)
+- KOReader's own update servers and dictionary download sites (so KOReader can still update itself and download dictionaries) — see [Why these sites are allowed](#why-these-sites-are-allowed)
 
 It can also start automatically on boot, so the firewall is active before Wi-Fi and the OTA service start.
 
@@ -83,7 +83,7 @@ Firewall ▸
 
 | Item | What it does |
 | --- | --- |
-| **Enable Firewall** | Blocks the internet immediately. Then keeps trying (every 30 s, in the background) to look up GitHub's IP addresses, and allows them as soon as Wi-Fi is up. So it's fine to press this while Wi-Fi is off. |
+| **Enable Firewall** | Blocks the internet immediately. Then keeps trying (every 30 s, in the background) to look up the IP addresses of the allowed sites, and allows them as soon as Wi-Fi is up. So it's fine to press this while Wi-Fi is off. |
 | **Disable Firewall** | Removes all blocking rules and allows all traffic again. |
 | **Install Autostart** | Installs a boot job (`/etc/upstart/firewall.conf`) so the firewall turns on at every boot, before Wi-Fi and the OTA service start. This writes to the Kindle's system partition. |
 | **Remove Autostart** | Deletes that boot job. |
@@ -96,16 +96,41 @@ Firewall ▸
 | Loopback (`lo`) | Internal communication between programs on the Kindle |
 | `192.168.0.0/16` | Your local network, any port. `10.x.x.x` and `172.16–31.x.x` are **not** allowed. |
 | DNS (port 53) | To any DNS server |
-| HTTPS to `api.github.com`, `github.com`, `objects.githubusercontent.com` | IPs looked up when you press Enable |
+| HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
 | Replies to allowed connections | |
 
 Everything else outbound is dropped.
+
+## Why these sites are allowed
+
+The goal is: **block Amazon (firmware updates, phoning home), but keep KOReader fully usable** — its built-in updater and its built-in dictionary downloader. These are the hosts KOReader actually contacts, taken from KOReader's own source code and checked on 2026-11-04:
+
+| Host | Port | Needed for | Source / how verified |
+| --- | --- | --- | --- |
+| `ota.koreader.rocks` | 80 | KOReader OTA update — **default server**. Version check and update files are on this same host (no redirect). | `ota_servers` in [otamanager.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/otamanager.lua); fetched the Kindle `.zsync` file, its download URL is relative (same host) |
+| `koreader-fr.ak-team.com`, `koreader-pl.ak-team.com`, `koreader-na.ak-team.com`, `koreader.ak-team.com` | 80 | KOReader OTA mirrors (selectable in KOReader's update settings) | same `ota_servers` list |
+| `gitlab.com` | 443 | Dictionary downloads — most dictionaries, including KOReader's own set | download URLs in [dictionaries.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/data/dictionaries.lua); no redirect |
+| `github.com` | 443 | Dictionary downloads (Wiktionary series and some others) | dictionaries.lua |
+| `release-assets.githubusercontent.com` | 443 | Where `github.com/…/releases/download/…` files actually come from | tested: github.com answers **302 → release-assets.githubusercontent.com** |
+| `objects.githubusercontent.com` | 443 | GitHub's older download host, kept in case some files still use it | not seen in testing; kept as a precaution |
+| `api.github.com` | 443 | Kept from earlier versions (GitHub API) | — |
+| `cyphar.github.io` | 443 | Japanese dictionaries (JMdict, JMnedict) | dictionaries.lua; no redirect |
+| `build.koreader.rocks` | 80 | A few dictionaries (CIA Factbook, GCIDE, Pape) | dictionaries.lua; no redirect |
+
+Both ports 80 and 443 are opened for every host above (KOReader OTA uses plain `http://`, most dictionaries use `https://`).
+
+Not included: two hosts used by single dictionaries in dictionaries.lua (`dicionario-aberto.net`, `http.debian.net`). Add them to `ALLOW_DOMAINS` in `bin/common.sh` if you need those dictionaries.
+
+Things to know:
+
+- `ota.koreader.rocks` and `build.koreader.rocks` sit behind **Cloudflare**, and the GitHub download hosts behind a shared CDN. Allowing their IPs also allows other sites on the same CDN IPs. None of them are Amazon's update servers, so this doesn't weaken the OTA block.
+- Installing KOReader **plugins** does not go through the Kindle: plugins are downloaded on a computer and copied over USB, so they need nothing allowed here.
 
 ## Files it creates
 
 | File | Where (on the USB drive) | Purpose |
 | --- | --- | --- |
-| `firewall.log` | `extensions/firewall/firewall.log` | One line per action: rules applied, GitHub allowed, autostart installed, errors. |
+| `firewall.log` | `extensions/firewall/firewall.log` | One line per action: rules applied, sites allowed, autostart installed, errors. |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
 | `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
 
@@ -118,17 +143,19 @@ Everything else outbound is dropped.
 3. You should see lines like:
    ```
    基本規則已套用（WAN 已阻斷）
-   已放行 github.com: 140.82.x.x
-   GitHub 放行完成
+   已放行 ota.koreader.rocks: 104.21.x.x 172.67.x.x
+   已放行 gitlab.com: 172.65.x.x
+   …
+   全部網域放行完成
    ```
-   (The log messages are in Chinese: "basic rules applied (WAN blocked)", "allowed github.com", "GitHub allowed — done".)
+   (The log messages are in Chinese: "basic rules applied (WAN blocked)", "allowed <site>", "all sites allowed — done".)
 
-If "GitHub 放行完成" never appears, the Kindle couldn't look up GitHub — usually because Wi-Fi isn't connected yet. It keeps retrying until it succeeds.
+If you see `尚未解析，持續重試: <sites>` ("not resolved yet, still retrying"), those sites couldn't be looked up — usually because Wi-Fi isn't connected yet. It retries every 30 s and writes this line about every 5 minutes. If only one mirror stays in that list for a long time, that mirror is probably down; everything else already works.
 
 ## Known limitations
 
 - **Without Autostart, rules are lost on reboot.** Press Enable again, or use Install Autostart.
-- **GitHub IPs can change.** If KOReader updates start failing days later, press Enable again.
+- **IP addresses can change**, especially for sites behind Cloudflare/CDNs. If KOReader updates or dictionary downloads start failing later, press Enable again.
 - **IPv4 only.** The tested Kindle has no IPv6 (`ip6tables` not present), so IPv6 is not handled.
 - **Wi-Fi error while the firewall is on** → `WIFI_NO_NET_PROBE` is missing, misnamed, or the Kindle wasn't rebooted after adding it. See [A reboot is required](#a-reboot-is-required-after-installing).
 - **Firmware updates remove Autostart**, since they overwrite the system partition (but the firewall's purpose is to block those updates).
@@ -148,7 +175,7 @@ The boot timing (`starting lab126`) and some other details were chosen based on 
 ### Step 1 — Collect information from your Kindle
 
 1. Install the extension as above.
-2. Firewall ▸ **Enable Firewall**, turn Wi-Fi on, wait a minute (so the log shows whether GitHub works).
+2. Firewall ▸ **Enable Firewall**, turn Wi-Fi on, wait a minute (so the log shows whether the allowed sites resolved).
 3. Firewall ▸ **Diagnose**.
 4. Over USB, copy out `extensions/firewall/diagnose.txt`.
 
@@ -171,7 +198,7 @@ Please read CLAUDE.md in the repo (or the "Notes for AI" section of the README) 
 - "nslookup github.com": does the output format match the parser in bin/common.sh?
 - "tools": is ip6tables present? If yes, block IPv6 outbound too.
 - "conntrack / state modules": which one works?
-- "firewall.log": did GitHub get allowed after Enable?
+- "firewall.log": did all allowed sites get resolved after Enable?
 - "mounts": is the root filesystem read-only (needs mntroot rw)?
 
 Tell me what needs to change for my Kindle and why, before changing anything. Then give me a new firewall.zip with the same structure (extensions/firewall/... plus WIFI_NO_NET_PROBE at the top level) and bump the version in config.xml.
@@ -196,6 +223,10 @@ Sources used while designing this extension:
 - Firmware update files are hosted on Amazon S3: [KindleModding – Manually Downloading Firmware Update Files](https://kindlemodding.org/firmware-and-flashing/downloading-updates.html)
 - KUAL extension `config.xml` / `menu.json` format: [Kindle + Python = e-Ink Dashboard (4DCu.be)](https://blog.4dcu.be/diy/2020/09/27/PythonKindleDashboard_1.html), [MobileRead Wiki – KUAL](https://wiki.mobileread.com/wiki/KUAL)
 - Alternative OTA blocking by renaming the update binaries (not used here): [GitHub – Darthagnon/BlockKindleOTA](https://github.com/Darthagnon/BlockKindleOTA), [MobileRead – OTA blocking on recent firmware](https://www.mobileread.com/forums/showthread.php?p=4329911)
+- KOReader OTA servers (`ota_servers`): [koreader/koreader – frontend/ui/otamanager.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/otamanager.lua)
+- KOReader dictionary download URLs: [koreader/koreader – frontend/ui/data/dictionaries.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/data/dictionaries.lua)
+- KOReader OTA file listing: [ota.koreader.rocks](http://ota.koreader.rocks/)
+- KOReader plugins are installed manually over USB: [Project Title plugin – Installation](https://github.com/joshuacant/ProjectTitle/wiki/Installation)
 - Amazon's own Wi-Fi troubleshooting page: [Resolve Wi-Fi Connection Issues on Your Kindle E-Reader](https://digprjsurvey.amazon.com/csad/help/node/G5HYWUVWRXFSCH7E)
 
 ## License

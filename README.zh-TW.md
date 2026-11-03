@@ -6,7 +6,7 @@
 
 - 區域網路（`192.168.x.x`）
 - DNS 查詢
-- 連到 GitHub 的 HTTPS（讓 KOReader 照樣能自我更新）
+- KOReader 自己的更新伺服器與字典下載網站（讓 KOReader 照樣能自我更新、下載字典），見[為什麼放行這些網站](#為什麼放行這些網站)
 
 也可以設定成開機自動啟用，讓防火牆比 Wi-Fi 與 OTA 服務更早生效。
 
@@ -83,7 +83,7 @@ Firewall ▸
 
 | 選項 | 做什麼 |
 | --- | --- |
-| **Enable Firewall** | 立刻擋掉外網。接著在背景每 30 秒嘗試查詢 GitHub 的 IP，Wi-Fi 一連上就放行。所以 Wi-Fi 沒開時按也沒關係。 |
+| **Enable Firewall** | 立刻擋掉外網。接著在背景每 30 秒嘗試查詢放行網站的 IP，Wi-Fi 一連上就放行。所以 Wi-Fi 沒開時按也沒關係。 |
 | **Disable Firewall** | 移除所有阻擋規則，恢復全部放行。 |
 | **Install Autostart** | 安裝開機設定（`/etc/upstart/firewall.conf`），每次開機都自動啟用防火牆，而且比 Wi-Fi 與 OTA 服務更早。這會寫入 Kindle 的系統分區。 |
 | **Remove Autostart** | 刪除那個開機設定。 |
@@ -96,16 +96,41 @@ Firewall ▸
 | 本機（`lo`） | Kindle 內部程式之間的溝通 |
 | `192.168.0.0/16` | 區域網路，所有埠。`10.x.x.x`、`172.16～31.x.x` **沒有**放行。 |
 | DNS（53 埠） | 任何 DNS 伺服器 |
-| 連到 `api.github.com`、`github.com`、`objects.githubusercontent.com` 的 HTTPS | 按下 Enable 時查到的 IP |
+| 連到 KOReader 相關網站的 HTTP 與 HTTPS，清單見[為什麼放行這些網站](#為什麼放行這些網站) | 按下 Enable 後查到的 IP |
 | 已放行連線的回應 | |
 
 其他所有對外流量都擋掉。
+
+## 為什麼放行這些網站
+
+目標是：**擋掉 Amazon（韌體更新、回傳資料），但 KOReader 要能完整使用**，包括它內建的更新功能和內建的字典下載。下面是 KOReader 實際會連的主機，取自 KOReader 自己的原始碼，2026-11-04 查證：
+
+| 主機 | 埠 | 用途 | 來源／怎麼查證的 |
+| --- | --- | --- | --- |
+| `ota.koreader.rocks` | 80 | KOReader OTA 更新，**預設伺服器**。版本檢查和更新檔都在同一台，不會轉址。 | [otamanager.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/otamanager.lua) 的 `ota_servers`；實際抓了 Kindle 用的 `.zsync` 檔，裡面的下載網址是相對路徑（同一台） |
+| `koreader-fr.ak-team.com`、`koreader-pl.ak-team.com`、`koreader-na.ak-team.com`、`koreader.ak-team.com` | 80 | KOReader OTA 鏡像（可以在 KOReader 的更新設定裡切換） | 同一份 `ota_servers` 清單 |
+| `gitlab.com` | 443 | 字典下載：大部分字典，包含 KOReader 自己維護的那一批 | [dictionaries.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/data/dictionaries.lua) 的下載網址；不轉址 |
+| `github.com` | 443 | 字典下載（維基詞典系列與其他幾本） | dictionaries.lua |
+| `release-assets.githubusercontent.com` | 443 | `github.com/…/releases/download/…` 的檔案實際從這裡下載 | 實測：github.com 回應 **302 → release-assets.githubusercontent.com** |
+| `objects.githubusercontent.com` | 443 | GitHub 較舊的下載網域，以防還有檔案使用它 | 實測沒看到，預防性保留 |
+| `api.github.com` | 443 | 舊版留下的（GitHub API） | — |
+| `cyphar.github.io` | 443 | 日文字典（JMdict、JMnedict） | dictionaries.lua；不轉址 |
+| `build.koreader.rocks` | 80 | 少數幾本字典（CIA Factbook、GCIDE、Pape） | dictionaries.lua；不轉址 |
+
+上面每個主機都同時放行 80 和 443 埠（KOReader OTA 用 `http://`，大部分字典用 `https://`）。
+
+沒有放行：dictionaries.lua 裡另外兩個只供單一字典用的主機（`dicionario-aberto.net`、`http.debian.net`）。需要那兩本字典的話，把它們加進 `bin/common.sh` 的 `ALLOW_DOMAINS`。
+
+要知道的事：
+
+- `ota.koreader.rocks`、`build.koreader.rocks` 架在 **Cloudflare** 後面，GitHub 的下載網域也是共用 CDN。放行它們的 IP，等於同一組 CDN IP 上的其他網站也一起放行。但這些都不是 Amazon 的更新伺服器，所以不影響擋 OTA 的效果。
+- 安裝 KOReader **外掛**不經過 Kindle 連網：外掛是在電腦上下載、用 USB 複製進去，所以這裡不需要放行任何東西。
 
 ## 會產生哪些檔案
 
 | 檔案 | 位置（USB 看到的路徑） | 用途 |
 | --- | --- | --- |
-| `firewall.log` | `extensions/firewall/firewall.log` | 每個動作一行：規則已套用、GitHub 已放行、開機設定已安裝、錯誤訊息。 |
+| `firewall.log` | `extensions/firewall/firewall.log` | 每個動作一行：規則已套用、網站已放行、開機設定已安裝、錯誤訊息。 |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | **Diagnose** 的輸出。 |
 | `firewall.conf` | `/etc/upstart/firewall.conf`（系統分區，USB 看不到） | 開機設定，按過 **Install Autostart** 才會有。 |
 
@@ -118,16 +143,18 @@ Firewall ▸
 3. 應該會看到類似：
    ```
    基本規則已套用（WAN 已阻斷）
-   已放行 github.com: 140.82.x.x
-   GitHub 放行完成
+   已放行 ota.koreader.rocks: 104.21.x.x 172.67.x.x
+   已放行 gitlab.com: 172.65.x.x
+   …
+   全部網域放行完成
    ```
 
-如果一直沒出現「GitHub 放行完成」，代表 Kindle 查不到 GitHub，通常是 Wi-Fi 還沒連上。它會持續重試，直到成功為止。
+如果看到「尚未解析，持續重試: <網站>」，代表那些網站查不到 IP，通常是 Wi-Fi 還沒連上。它每 30 秒重試一次，大約每 5 分鐘寫一次這行。如果長時間只剩某一個鏡像在清單裡，多半是那個鏡像掛了，其他網站已經可以用。
 
 ## 已知限制
 
 - **沒裝開機自動執行的話，重開機後規則會消失。** 再按一次 Enable，或使用 Install Autostart。
-- **GitHub 的 IP 會變。** 如果幾天後 KOReader 更新失敗，再按一次 Enable。
+- **IP 會變**，尤其是架在 Cloudflare／CDN 後面的網站。如果之後 KOReader 更新或字典下載失敗，再按一次 Enable。
 - **只處理 IPv4。** 實測的 Kindle 沒有 IPv6（沒有 `ip6tables`），所以沒有處理 IPv6。
 - **防火牆開著時 Wi-Fi 出錯** → `WIFI_NO_NET_PROBE` 不存在、檔名不對，或放進去之後沒有重開機。見[安裝後一定要重開機](#安裝後一定要重開機)。
 - **韌體更新會清掉開機設定**，因為更新會覆蓋系統分區（不過這個防火牆本來就是要擋更新）。
@@ -147,7 +174,7 @@ Firewall ▸
 ### 第 1 步：從你的 Kindle 收集資訊
 
 1. 照上面的方式安裝插件。
-2. Firewall ▸ **Enable Firewall**，打開 Wi-Fi，等一分鐘（讓紀錄檔顯示 GitHub 有沒有放行成功）。
+2. Firewall ▸ **Enable Firewall**，打開 Wi-Fi，等一分鐘（讓紀錄檔顯示放行的網站有沒有查到 IP）。
 3. Firewall ▸ **Diagnose**。
 4. 用 USB 把 `extensions/firewall/diagnose.txt` 複製出來。
 
@@ -170,7 +197,7 @@ Firewall ▸
 - 「nslookup github.com」：輸出格式跟 bin/common.sh 的解析寫法對得上嗎？
 - 「tools」：有沒有 ip6tables？有的話也要擋 IPv6 對外。
 - 「conntrack / state modules」：哪一個能用？
-- 「firewall.log」：Enable 之後 GitHub 有沒有放行成功？
+- 「firewall.log」：Enable 之後放行的網站是不是都查到 IP 了？
 - 「mounts」：根目錄是不是唯讀（需要 mntroot rw）？
 
 動手修改之前，先告訴我針對我的 Kindle 要改哪些地方、為什麼。之後給我一個新的 firewall.zip，結構維持一樣（extensions/firewall/... 加上最上層的 WIFI_NO_NET_PROBE），並把 config.xml 的版本號往上加。
@@ -195,6 +222,10 @@ Firewall ▸
 - 韌體更新檔放在 Amazon S3：[KindleModding – Manually Downloading Firmware Update Files](https://kindlemodding.org/firmware-and-flashing/downloading-updates.html)
 - KUAL 插件 `config.xml`／`menu.json` 格式：[Kindle + Python = e-Ink Dashboard（4DCu.be）](https://blog.4dcu.be/diy/2020/09/27/PythonKindleDashboard_1.html)、[MobileRead Wiki – KUAL](https://wiki.mobileread.com/wiki/KUAL)
 - 另一種擋 OTA 的方式：把更新程式改名（本插件未採用）：[GitHub – Darthagnon/BlockKindleOTA](https://github.com/Darthagnon/BlockKindleOTA)、[MobileRead – OTA blocking on recent firmware](https://www.mobileread.com/forums/showthread.php?p=4329911)
+- KOReader OTA 伺服器（`ota_servers`）：[koreader/koreader – frontend/ui/otamanager.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/otamanager.lua)
+- KOReader 字典下載網址：[koreader/koreader – frontend/ui/data/dictionaries.lua](https://github.com/koreader/koreader/blob/master/frontend/ui/data/dictionaries.lua)
+- KOReader OTA 檔案目錄：[ota.koreader.rocks](http://ota.koreader.rocks/)
+- KOReader 外掛是用 USB 手動安裝：[Project Title 外掛 – Installation](https://github.com/joshuacant/ProjectTitle/wiki/Installation)
 - Amazon 官方的 Wi-Fi 疑難排解：[Resolve Wi-Fi Connection Issues on Your Kindle E-Reader](https://digprjsurvey.amazon.com/csad/help/node/G5HYWUVWRXFSCH7E)
 
 ## 授權

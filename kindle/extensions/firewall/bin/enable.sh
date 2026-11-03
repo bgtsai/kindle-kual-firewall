@@ -1,12 +1,12 @@
 #!/bin/sh
-# firewall enable.sh v1.5
+# firewall enable.sh v1.7
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
 
 # ---- 基本規則：立即生效，不依賴網路 ----
-# 為什麼先套基本規則、GitHub 之後再補：Wi-Fi 沒開時 DNS 查不到 GitHub（實測 2026-11-04），
-# 舊版在那種情況下一條 GitHub 規則都沒加，連上網後也不會補。
+# 為什麼先套基本規則、放行網域之後再補：Wi-Fi 沒開時 DNS 查不到（實測 2026-11-04），
+# 舊版在那種情況下一條放行規則都沒加，連上網後也不會補。
 iptables -F OUTPUT
 iptables -A OUTPUT -o lo -j ACCEPT
 iptables -A OUTPUT -d 192.168.0.0/16 -j ACCEPT
@@ -21,14 +21,18 @@ log "基本規則已套用（WAN 已阻斷）"
 # ---- 背景重試：解析成功的網域就補上放行規則，全部成功後結束 ----
 # 用 -I OUTPUT 1 插在最前面，才會排在 DROP 之前
 (
-    pending="$ALLOW_DOMAINS"
+    pending="$(echo $ALLOW_DOMAINS)"
+    round=0
     while [ -n "$pending" ]; do
+        round=$((round + 1))
         still=""
         for d in $pending; do
             ips="$(resolve_ipv4 "$d")"
             if [ -n "$ips" ]; then
                 for ip in $ips; do
-                    iptables -I OUTPUT 1 -p tcp -d "$ip" --dport 443 -j ACCEPT
+                    for port in $ALLOW_PORTS; do
+                        iptables -I OUTPUT 1 -p tcp -d "$ip" --dport "$port" -j ACCEPT
+                    done
                 done
                 log "已放行 $d: $(echo $ips)"
             else
@@ -36,11 +40,14 @@ log "基本規則已套用（WAN 已阻斷）"
             fi
         done
         pending="$(echo $still)"
-        [ -n "$pending" ] && sleep "$RESOLVE_RETRY_INTERVAL"
+        if [ -n "$pending" ]; then
+            [ $((round % RESOLVE_PENDING_LOG_ROUNDS)) -eq 1 ] && log "尚未解析，持續重試: $pending"
+            sleep "$RESOLVE_RETRY_INTERVAL"
+        fi
     done
-    log "GitHub 放行完成"
+    log "全部網域放行完成"
     rm -f "$PIDFILE"
 ) </dev/null >/dev/null 2>&1 &
 echo $! > "$PIDFILE"
 
-notify "Firewall ON (GitHub pending)"
+notify "Firewall ON (allow-list pending)"

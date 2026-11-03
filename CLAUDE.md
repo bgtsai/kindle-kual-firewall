@@ -15,7 +15,7 @@ kindle/
         ├── menu.json             one top-level "Firewall" item; all actions in its "items" submenu
         └── bin/
             ├── common.sh         shared paths, ALLOW_DOMAINS, resolve_ipv4(), log(), notify()
-            ├── enable.sh         base rules now, GitHub allowed later by a background retry loop
+            ├── enable.sh         base rules now, allow-list (KOReader OTA + dictionary hosts) added later by a background retry loop
             ├── disable.sh        stop retry loop, flush OUTPUT, policy ACCEPT
             ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
             ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
@@ -41,7 +41,8 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 
 ## Design decisions (don't undo without a reason)
 
-- **Base rules first, GitHub later.** With Wi-Fi off, DNS fails; the old version then added no GitHub rule and never recovered. GitHub rules are inserted with `-I OUTPUT 1` so they sit before the final DROP.
+- **Base rules first, allow-list later.** With Wi-Fi off, DNS fails; the old version then added no allow rule and never recovered. Allow rules are inserted with `-I OUTPUT 1` so they sit before the final DROP.
+- **Allow-list = what KOReader actually contacts** (OTA servers from `otamanager.lua`, dictionary hosts from `dictionaries.lua`), ports 80 and 443. Before adding a host, check it in KOReader's source and test for redirects (`curl -sI`); github.com release downloads redirect to `release-assets.githubusercontent.com`. Keep README's "Why these sites are allowed" table in sync.
 - **Boot job must never block boot.** It only calls `enable.sh` if the file exists, and `enable.sh` backgrounds the slow part. Keep it a `task` on `starting lab126` so it finishes before Wi-Fi/OTA start.
 - **Retry loop is single-instance** via `/var/run/firewall_resolver.pid`; Enable and Disable kill the previous one.
 - Errors are written to `firewall.log`, never silently swallowed.
