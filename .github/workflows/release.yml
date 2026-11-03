@@ -1,0 +1,51 @@
+# 推送到 main 且 firewall/ 有變動時：讀 config.xml 的 <version>，
+# 該版本還沒有 Release 就打包 firewall.zip 並發布 v{version}。
+# 為什麼用 Actions：Claude 雲端環境不能建 tag／Release（見知識庫 27 第 9 條）。
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ['firewall/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version
+        id: ver
+        run: |
+          v=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' firewall/config.xml | head -1)
+          [ -n "$v" ] || { echo "version not found in firewall/config.xml"; exit 1; }
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if release exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.ver.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=1" >> "$GITHUB_OUTPUT"
+            echo "Release ${{ steps.ver.outputs.tag }} already exists, skipping."
+          fi
+
+      - name: Build zip
+        if: steps.check.outputs.exists != '1'
+        run: |
+          chmod 755 firewall/bin/*.sh
+          zip -r firewall.zip firewall
+
+      - name: Create release
+        if: steps.check.outputs.exists != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" firewall.zip \
+            --title "firewall ${{ steps.ver.outputs.tag }}" \
+            --notes "Download **firewall.zip**, unzip it, and copy the \`firewall\` folder into \`extensions/\` on your Kindle. See README for details."

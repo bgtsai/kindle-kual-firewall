@@ -1,0 +1,35 @@
+{
+  "items": [
+    {
+      "name": "Firewall",
+      "priority": 1,
+      "items": [
+        {
+          "name": "Enable Firewall (Block WAN)",
+          "priority": 1,
+          "action": "./bin/enable.sh"
+        },
+        {
+          "name": "Disable Firewall (Allow WAN)",
+          "priority": 2,
+          "action": "./bin/disable.sh"
+        },
+        {
+          "name": "Install Autostart (enable on boot)",
+          "priority": 3,
+          "action": "./bin/autostart_install.sh"
+        },
+        {
+          "name": "Remove Autostart",
+          "priority": 4,
+          "action": "./bin/autostart_remove.sh"
+        },
+        {
+          "name": "Diagnose (write diagnose.txt)",
+          "priority": 5,
+          "action": "./bin/diagnose.sh"
+        }
+      ]
+    }
+  ]
+}
