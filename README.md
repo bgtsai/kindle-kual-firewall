@@ -142,15 +142,19 @@ Things to know:
 2. Wait about a minute, connect USB, open `extensions/firewall/firewall.log`.
 3. You should see lines like:
    ```
-   基本規則已套用（WAN 已阻斷）
-   已放行 ota.koreader.rocks: 104.21.x.x 172.67.x.x
-   已放行 gitlab.com: 172.65.x.x
+   2026-11-04 05:31:20  Basic rules applied (WAN blocked)
+                        Chinese | 基本規則已套用（WAN 已阻斷）
+   2026-11-04 05:31:21  Allowed ota.koreader.rocks: 104.21.x.x 172.67.x.x
+                        Chinese | 已放行上一行的網域
+   2026-11-04 05:31:21  Allowed gitlab.com: 172.65.x.x
+                        Chinese | 已放行上一行的網域
    …
-   全部網域放行完成
+   2026-11-04 05:31:22  All domains allowed
+                        Chinese | 全部網域放行完成
    ```
-   (The log messages are in Chinese: "basic rules applied (WAN blocked)", "allowed <site>", "all sites allowed — done".)
+   Every entry is written twice: an English line with the time, then an indented line starting with `Chinese |` — the same message in Chinese. You can skip the `Chinese |` lines.
 
-If you see `尚未解析，持續重試: <sites>` ("not resolved yet, still retrying"), those sites couldn't be looked up — usually because Wi-Fi isn't connected yet. It retries every 30 s and writes this line about every 5 minutes. If only one mirror stays in that list for a long time, that mirror is probably down; everything else already works.
+If you see `Not resolved yet, retrying: <sites>`, those sites couldn't be looked up — usually because Wi-Fi isn't connected yet. It retries every 30 s and writes this line about every 5 minutes. If only one mirror stays in that list for a long time, that mirror is probably down; everything else already works.
 
 ## Known limitations
 

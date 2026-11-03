@@ -142,14 +142,19 @@ Firewall ▸
 2. 等約一分鐘，接上 USB，打開 `extensions/firewall/firewall.log`。
 3. 應該會看到類似：
    ```
-   基本規則已套用（WAN 已阻斷）
-   已放行 ota.koreader.rocks: 104.21.x.x 172.67.x.x
-   已放行 gitlab.com: 172.65.x.x
+   2026-11-04 05:31:20  Basic rules applied (WAN blocked)
+                        Chinese | 基本規則已套用（WAN 已阻斷）
+   2026-11-04 05:31:21  Allowed ota.koreader.rocks: 104.21.x.x 172.67.x.x
+                        Chinese | 已放行上一行的網域
+   2026-11-04 05:31:21  Allowed gitlab.com: 172.65.x.x
+                        Chinese | 已放行上一行的網域
    …
-   全部網域放行完成
+   2026-11-04 05:31:22  All domains allowed
+                        Chinese | 全部網域放行完成
    ```
+   每筆紀錄寫兩行：第一行是英文、帶時間；下一行縮排、以 `Chinese |` 開頭，是同一句的中文。網域、IP 只寫在英文那一行。
 
-如果看到「尚未解析，持續重試: <網站>」，代表那些網站查不到 IP，通常是 Wi-Fi 還沒連上。它每 30 秒重試一次，大約每 5 分鐘寫一次這行。如果長時間只剩某一個鏡像在清單裡，多半是那個鏡像掛了，其他網站已經可以用。
+如果看到 `Not resolved yet, retrying: <網站>`（中文行是「上一行的網域尚未解析，持續重試」），代表那些網站查不到 IP，通常是 Wi-Fi 還沒連上。它每 30 秒重試一次，大約每 5 分鐘寫一次這行。如果長時間只剩某一個鏡像在清單裡，多半是那個鏡像掛了，其他網站已經可以用。
 
 ## 已知限制
 

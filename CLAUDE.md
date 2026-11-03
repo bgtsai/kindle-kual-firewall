@@ -46,6 +46,7 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 - **Boot job must never block boot.** It only calls `enable.sh` if the file exists, and `enable.sh` backgrounds the slow part. Keep it a `task` on `starting lab126` so it finishes before Wi-Fi/OTA start.
 - **Retry loop is single-instance** via `/var/run/firewall_resolver.pid`; Enable and Disable kill the previous one.
 - Errors are written to `firewall.log`, never silently swallowed.
+- **Bilingual log**: `log "<English>" "<中文>"` writes an English line with timestamp, then an indented `Chinese | …` line. Data (domains, IPs, paths) goes only in the English line. Every new log call must pass both strings; update README "Checking that it works" if messages change.
 
 ## After editing
 

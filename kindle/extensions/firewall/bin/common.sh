@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.7 — 各腳本共用的路徑與函式
+# firewall common.sh v1.8 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -34,7 +34,14 @@ RESOLVE_RETRY_INTERVAL=30
 # 還有網域沒解析成功時，每隔幾輪在 log 記一次清單（避免每 30 秒寫一行）
 RESOLVE_PENDING_LOG_ROUNDS=10
 
-log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+# 雙語 log：log "<English>" "<中文>"
+# 英文行帶時間；中文行縮排、以「Chinese | 」開頭，看不懂中文的人一眼知道可以跳過。
+# 網域、IP、路徑只放英文行，中文行不重複，避免兩邊內容不一致。
+log() {
+    ts="$(date '+%Y-%m-%d %H:%M:%S')"
+    echo "$ts  $1" >> "$LOG"
+    [ -n "$2" ] && echo "                     Chinese | $2" >> "$LOG"
+}
 
 # 螢幕提示（eips 不存在就略過）
 notify() { which eips >/dev/null 2>&1 && eips 2 2 "$1                    " >/dev/null 2>&1; }
