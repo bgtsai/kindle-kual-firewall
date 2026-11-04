@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall enable.sh v1.8
+# firewall enable.sh v1.9
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
@@ -12,6 +12,9 @@ iptables -A OUTPUT -o lo -j ACCEPT
 iptables -A OUTPUT -d 192.168.0.0/16 -j ACCEPT
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+for port in $CALIBRE_BROADCAST_PORTS; do
+    iptables -A OUTPUT -p udp -d 255.255.255.255 --dport "$port" -j ACCEPT
+done
 iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null \
   || iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT \
   || log "ERROR: neither conntrack nor state module is available" "錯誤：conntrack 與 state 模組都無法使用"

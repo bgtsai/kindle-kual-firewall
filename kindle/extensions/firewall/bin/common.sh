@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.8 — 各腳本共用的路徑與函式
+# firewall common.sh v1.9 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -28,6 +28,12 @@ objects.githubusercontent.com
 cyphar.github.io
 "
 ALLOW_PORTS="80 443"
+
+# calibre 無線連線（給 kindle-kual-calibre-wireless 插件）找 calibre 用的 UDP 廣播。
+# UNCaGED 把目標寫死成 255.255.255.255（calibre/calibre.go）；埠號＝calibre
+# smart_device_app/driver.py 的 BROADCAST_PORTS。calibre 的回覆是 INPUT 方向，
+# 由那個插件自己在連線期間開、斷線時關，不放在這裡。
+CALIBRE_BROADCAST_PORTS="54982 48123 39001 44044 59678"
 
 # 背景重試解析的間隔 (s)
 RESOLVE_RETRY_INTERVAL=30

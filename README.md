@@ -87,7 +87,7 @@ Firewall ▸
 | **Disable Firewall** | Removes all blocking rules and allows all traffic again. |
 | **Install Autostart** | Installs a boot job (`/etc/upstart/firewall.conf`) so the firewall turns on at every boot, before Wi-Fi and the OTA service start. This writes to the Kindle's system partition. |
 | **Remove Autostart** | Deletes that boot job. |
-| **Diagnose** | Writes system information to `diagnose.txt` (read-only, changes nothing). Used for troubleshooting and for customizing the extension for another model. |
+| **Diagnose** | Writes system information to `diagnose.txt` (read-only, changes nothing). Then, for 2 minutes in the background, records Wi-Fi events to `diagnose_wifi_events.txt` — turn Wi-Fi off and on again during that time. Used for troubleshooting and for customizing the extension for another model. |
 
 ## What exactly is allowed
 
@@ -97,6 +97,7 @@ Firewall ▸
 | `192.168.0.0/16` | Your local network, any port. `10.x.x.x` and `172.16–31.x.x` are **not** allowed. |
 | DNS (port 53) | To any DNS server |
 | HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
+| UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So a calibre wireless-connection plugin on the Kindle can find calibre on your computer. See [Why these sites are allowed](#why-these-sites-are-allowed). |
 | Replies to allowed connections | |
 
 Everything else outbound is dropped.
@@ -115,6 +116,7 @@ The goal is: **block Amazon (firmware updates, phoning home), but keep KOReader 
 | `objects.githubusercontent.com` | 443 | GitHub's older download host, kept in case some files still use it | not seen in testing; kept as a precaution |
 | `api.github.com` | 443 | Kept from earlier versions (GitHub API) | — |
 | `cyphar.github.io` | 443 | Japanese dictionaries (JMdict, JMnedict) | dictionaries.lua; no redirect |
+| UDP broadcast `255.255.255.255` (not a site) | 54982, 48123, 39001, 44044, 59678 | Finding calibre on the local network for wireless book transfer (for the planned companion plugin `kindle-kual-calibre-wireless`). The broadcast never leaves your local network. | The UNCaGED library hard-codes the target `255.255.255.255` (`calibre/calibre.go`); the ports are calibre's `BROADCAST_PORTS` (`src/calibre/devices/smart_device_app/driver.py`). calibre's reply comes **in** (INPUT), which this firewall does not filter; the TCP connection to calibre goes to `192.168.x.x`, already allowed. |
 | `build.koreader.rocks` | 80 | A few dictionaries (CIA Factbook, GCIDE, Pape) | dictionaries.lua; no redirect |
 
 Both ports 80 and 443 are opened for every host above (KOReader OTA uses plain `http://`, most dictionaries use `https://`).
@@ -132,6 +134,7 @@ Things to know:
 | --- | --- | --- |
 | `firewall.log` | `extensions/firewall/firewall.log` | One line per action: rules applied, sites allowed, autostart installed, errors. |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
+| `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | Wi-Fi events recorded for 2 minutes after **Diagnose**. |
 | `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
 
 `WIFI_NO_NET_PROBE` at the drive root is not created by the extension — it comes in the zip (see [Installation](#installation)).
@@ -180,8 +183,8 @@ The boot timing (`starting lab126`) and some other details were chosen based on 
 
 1. Install the extension as above.
 2. Firewall ▸ **Enable Firewall**, turn Wi-Fi on, wait a minute (so the log shows whether the allowed sites resolved).
-3. Firewall ▸ **Diagnose**.
-4. Over USB, copy out `extensions/firewall/diagnose.txt`.
+3. Firewall ▸ **Diagnose**, then within 2 minutes turn Wi-Fi off and on again.
+4. Wait until the 2 minutes are over, then over USB copy out `extensions/firewall/diagnose.txt` and `extensions/firewall/diagnose_wifi_events.txt`.
 
 `diagnose.txt` contains your Kindle's firmware version, system file list and firewall rules. It contains no account data, but look through it before sharing it.
 
@@ -190,7 +193,7 @@ The boot timing (`starting lab126`) and some other details were chosen based on 
 Start a **new** conversation and attach:
 
 1. `firewall.zip` (the original release file — it contains `extensions/firewall/` and `WIFI_NO_NET_PROBE`)
-2. your `diagnose.txt`
+2. your `diagnose.txt` and `diagnose_wifi_events.txt`
 
 Then paste this message (edit the last part):
 

@@ -38,3 +38,9 @@
 - 第 3 項用 stub 的 `iptables`／`nslookup`／`lipc-wait-event` 放在 PATH 上模擬（先不給連線事件 → 確認不解析；給事件 → 確認解析並插規則）。
 - 只能實機確認的：飛行模式狀態是否跨重開機保留、關機事件名稱、Wi-Fi 連線事件名稱、廣播規則加了之後 calibre 能否被找到（要等新插件做出來才能端到端測）。
 - 開機設定有改的話，提醒使用者先用舊版 **Remove Autostart** 再裝新版。
+
+## 進度
+
+- 2026-11-04 v1.9：第 1 項完成（calibre 廣播放行）；diagnose.sh 擴充（lipc 狀態、shutdown／wifi 相關 upstart 全文、背景錄 120 秒 Wi-Fi 事件），等使用者實機跑 Diagnose 回傳結果，再做第 3、2 項。
+- 第 2 項使用者選定：**獨立的選單開關**（Install／Remove Airplane-on-Boot），不跟 Autostart 綁在一起；動手前仍要先問。
+- KOReader `frontend/device/kindle/device.lua` 註解記錄的 wifid 事件：連上 `cmConnected`＋`cmStateChange "CONNECTED"`，斷線 `cmDisconnected`＋`cmStateChange "NA"`；屬性 `com.lab126.wifid cmState`。5.13.5 待 diagnose 確認。

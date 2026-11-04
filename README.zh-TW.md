@@ -87,7 +87,7 @@ Firewall ▸
 | **Disable Firewall** | 移除所有阻擋規則，恢復全部放行。 |
 | **Install Autostart** | 安裝開機設定（`/etc/upstart/firewall.conf`），每次開機都自動啟用防火牆，而且比 Wi-Fi 與 OTA 服務更早。這會寫入 Kindle 的系統分區。 |
 | **Remove Autostart** | 刪除那個開機設定。 |
-| **Diagnose** | 把系統資訊寫進 `diagnose.txt`（只讀取、不改任何東西）。用來排查問題，或把插件改成適合其他機型。 |
+| **Diagnose** | 把系統資訊寫進 `diagnose.txt`（只讀取、不改任何東西）。接著在背景錄 2 分鐘的 Wi-Fi 事件到 `diagnose_wifi_events.txt`，這段時間內請把 Wi-Fi 關掉再打開。用來排查問題，或把插件改成適合其他機型。 |
 
 ## 到底放行了哪些
 
@@ -97,6 +97,7 @@ Firewall ▸
 | `192.168.0.0/16` | 區域網路，所有埠。`10.x.x.x`、`172.16～31.x.x` **沒有**放行。 |
 | DNS（53 埠） | 任何 DNS 伺服器 |
 | 連到 KOReader 相關網站的 HTTP 與 HTTPS，清單見[為什麼放行這些網站](#為什麼放行這些網站) | 按下 Enable 後查到的 IP |
+| UDP 廣播到 `255.255.255.255`，埠 `54982 48123 39001 44044 59678` | 讓 Kindle 上的 calibre 無線連線插件找得到電腦上的 calibre，見[為什麼放行這些網站](#為什麼放行這些網站)。 |
 | 已放行連線的回應 | |
 
 其他所有對外流量都擋掉。
@@ -115,6 +116,7 @@ Firewall ▸
 | `objects.githubusercontent.com` | 443 | GitHub 較舊的下載網域，以防還有檔案使用它 | 實測沒看到，預防性保留 |
 | `api.github.com` | 443 | 舊版留下的（GitHub API） | — |
 | `cyphar.github.io` | 443 | 日文字典（JMdict、JMnedict） | dictionaries.lua；不轉址 |
+| UDP 廣播 `255.255.255.255`（不是網站） | 54982、48123、39001、44044、59678 | 在區域網路上找 calibre，用來無線傳書（給規劃中的配套插件 `kindle-kual-calibre-wireless`）。廣播不會離開你家的區域網路。 | UNCaGED 函式庫把目標寫死成 `255.255.255.255`（`calibre/calibre.go`）；埠號是 calibre 的 `BROADCAST_PORTS`（`src/calibre/devices/smart_device_app/driver.py`）。calibre 的回覆是**送進來**的方向（INPUT），這個防火牆不管；連到 calibre 的 TCP 目標是 `192.168.x.x`，本來就放行。 |
 | `build.koreader.rocks` | 80 | 少數幾本字典（CIA Factbook、GCIDE、Pape） | dictionaries.lua；不轉址 |
 
 上面每個主機都同時放行 80 和 443 埠（KOReader OTA 用 `http://`，大部分字典用 `https://`）。
@@ -132,6 +134,7 @@ Firewall ▸
 | --- | --- | --- |
 | `firewall.log` | `extensions/firewall/firewall.log` | 每個動作一行：規則已套用、網站已放行、開機設定已安裝、錯誤訊息。 |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | **Diagnose** 的輸出。 |
+| `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | 按 **Diagnose** 後 2 分鐘內錄到的 Wi-Fi 事件。 |
 | `firewall.conf` | `/etc/upstart/firewall.conf`（系統分區，USB 看不到） | 開機設定，按過 **Install Autostart** 才會有。 |
 
 磁碟根目錄的 `WIFI_NO_NET_PROBE` 不是插件產生的，是 zip 裡附的（見[安裝](#安裝)）。
@@ -180,8 +183,8 @@ Firewall ▸
 
 1. 照上面的方式安裝插件。
 2. Firewall ▸ **Enable Firewall**，打開 Wi-Fi，等一分鐘（讓紀錄檔顯示放行的網站有沒有查到 IP）。
-3. Firewall ▸ **Diagnose**。
-4. 用 USB 把 `extensions/firewall/diagnose.txt` 複製出來。
+3. Firewall ▸ **Diagnose**，接著 2 分鐘內把 Wi-Fi 關掉再打開。
+4. 等 2 分鐘過後，用 USB 把 `extensions/firewall/diagnose.txt` 和 `extensions/firewall/diagnose_wifi_events.txt` 複製出來。
 
 `diagnose.txt` 裡有 Kindle 的韌體版本、系統檔案清單與防火牆規則，不含帳號資料，但分享前請自己看過一遍。
 
@@ -190,7 +193,7 @@ Firewall ▸
 開一個**新的**對話，附上：
 
 1. `firewall.zip`（Release 下載的原始檔，裡面有 `extensions/firewall/` 和 `WIFI_NO_NET_PROBE`）
-2. 你的 `diagnose.txt`
+2. 你的 `diagnose.txt` 和 `diagnose_wifi_events.txt`
 
 然後貼上這段文字（最後一段改成你的需求）：
 

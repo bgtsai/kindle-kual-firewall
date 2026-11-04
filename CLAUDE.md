@@ -19,7 +19,7 @@ kindle/
             ├── disable.sh        stop retry loop, flush OUTPUT, policy ACCEPT
             ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
             ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
-            └── diagnose.sh       read-only; writes firewall/diagnose.txt
+            └── diagnose.sh       read-only; writes firewall/diagnose.txt, then records Wi-Fi/cmd lipc events for 120 s in background → diagnose_wifi_events.txt
 .github/workflows/release.yml   on push to main touching kindle/**: zips kindle/ contents into firewall.zip, releases v<version> (skips if exists)
 ```
 
@@ -35,6 +35,7 @@ Always deliver the result as `firewall.zip` whose top level is `extensions/` + `
 | IPv6 | not implemented | `tools`: if `ip6tables` exists and `IPv6 addresses` is non-empty, add equivalent ip6tables rules (tested device had neither). |
 | Root fs read-only | `autostart_*.sh` | `mounts`: `/dev/root on / ... (ro,...)` → `mntroot rw/ro` needed. Check `mntroot` exists in `tools`. |
 | Wi-Fi connectivity probe | `kindle/WIFI_NO_NET_PROBE` | Kindle probes `spectrum.s3.amazonaws.com/kindle-wifi/wifistub.html` after joining Wi-Fi; the firewall blocks it → Wi-Fi error. The flag file disables the probe (confirmed on 5.13.5; read only when wifid starts → reboot needed). If the user's Kindle ignores the flag, look for how `wifid.conf` builds its arguments. Do **not** solve it by allowing S3 IPs: firmware updates are also on S3. |
+| calibre broadcast | `common.sh` `CALIBRE_BROADCAST_PORTS`, `enable.sh` | OUTPUT UDP to `255.255.255.255` on calibre's 5 broadcast ports (UNCaGED hard-codes 255.255.255.255). INPUT (calibre's reply) is the calibre plugin's job, not this firewall's. |
 | LAN range | `enable.sh` | User's network may be `10.0.0.0/8` or `172.16.0.0/12` instead of `192.168.0.0/16`. Ask. |
 
 Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptables` at `/usr/sbin/iptables`, no `ip6tables`.
