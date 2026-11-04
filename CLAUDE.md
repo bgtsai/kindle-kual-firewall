@@ -19,6 +19,9 @@ kindle/
             ├── disable.sh        stop background process + its lipc-wait-event, flush OUTPUT, delete FW_ALLOW, policy ACCEPT
             ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
             ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
+            ├── airplane_install.sh    writes /etc/upstart/firewall_airplane_{shutdown,boot}.conf
+            ├── airplane_remove.sh     deletes them
+            ├── airplane_apply.sh      called by those jobs: `shutdown` / `boot` → lipc-set-prop -i com.lab126.cmd wirelessEnable 0
             └── diagnose.sh       read-only; writes firewall/diagnose.txt, then records Wi-Fi/cmd lipc events for 120 s in background → diagnose_wifi_events.txt
 .github/workflows/release.yml   on push to main touching kindle/**: zips kindle/ contents into firewall.zip, releases v<version> (skips if exists)
 ```
@@ -46,6 +49,7 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 - **Event-driven, not polling.** The background process blocks in `lipc-wait-event -s 0 com.lab126.wifid cmStateChange` and resolves only on a transition to `CONNECTED` (read via `lipc-get-prop com.lab126.wifid cmState`). Don't trigger on `cmConnected`: it repeats every ~30 s while connected (5.13.5). If lipc-wait-event fails (wifid not up yet at boot), fall back to polling every `WAIT_FALLBACK_POLL_S`.
 - **Allow-list = what KOReader actually contacts** (OTA servers from `otamanager.lua`, dictionary hosts from `dictionaries.lua`), ports 80 and 443. Before adding a host, check it in KOReader's source and test for redirects (`curl -sI`); github.com release downloads redirect to `release-assets.githubusercontent.com`. Keep README's "Why these sites are allowed" table in sync.
 - **Boot job must never block boot.** It only calls `enable.sh` if the file exists, and `enable.sh` backgrounds the slow part. Keep it a `task` on `starting lab126` so it finishes before Wi-Fi/OTA start.
+- **Airplane-on-Boot** (optional, separate menu items, user's choice): shutdown job `start on stopping wifid`, runs only if `/tmp/shutdown_in_progress` exists (shutdown.conf writes it before stopping services), wrapped in busybox `timeout -t 10`; boot job `start on started cmd`, waits in background up to `AIRPLANE_BOOT_WAIT_S` for com.lab126.cmd. Airplane mode persists across reboot (user-tested on 5.13.5).
 - **Background process is single-instance** via `/var/run/firewall_resolver.pid` (+ `firewall_waiter.pid` for its current lipc-wait-event); Enable and Disable kill both.
 - Errors are written to `firewall.log`, never silently swallowed.
 - **Bilingual log**: `log "<English>" "<中文>"` writes an English line with timestamp, then an indented `Chinese | …` line. Data (domains, IPs, paths) goes only in the English line. Every new log call must pass both strings; update README "Checking that it works" if messages change.
@@ -58,4 +62,4 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 4. If you changed `enable.sh` logic, test it with stub `iptables`/`nslookup` scripts on PATH (simulate DNS failing a few times, then succeeding).
 5. Grep for leftover old names/paths if you renamed anything (folder name, `/etc/upstart/firewall.conf`, `firewall.log`).
 6. Tell the user what was verified by you vs. what only the real device can confirm.
-7. If the boot job changed, tell the user to run **Remove Autostart** with the old version before installing the new one.
+7. If a boot job changed, tell the user to run **Remove Autostart** / **Remove Airplane-on-Boot** with the old version before installing the new one.

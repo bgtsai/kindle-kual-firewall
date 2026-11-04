@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.10 — 各腳本共用的路徑與函式
+# firewall common.sh v1.11 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -7,6 +7,11 @@ PIDFILE="/var/run/firewall_resolver.pid"
 # 背景程序目前正在等的 lipc-wait-event，Disable 時要一併停掉
 WAITER_PIDFILE="/var/run/firewall_waiter.pid"
 UPSTART_CONF="/etc/upstart/firewall.conf"
+# Airplane-on-Boot：關機時、開機時各一個 upstart 設定（一個 .conf 只能有一組 start on）
+AIRPLANE_SHUTDOWN_CONF="/etc/upstart/firewall_airplane_shutdown.conf"
+AIRPLANE_BOOT_CONF="/etc/upstart/firewall_airplane_boot.conf"
+# 開機時最多等 com.lab126.cmd 回應幾秒
+AIRPLANE_BOOT_WAIT_S=60
 
 # 允許連線的網域，HTTP (80) 與 HTTPS (443) 都放行。
 # 為什麼兩個埠都開：KOReader OTA 走 http://（80），字典下載多半走 https://（443）。
@@ -76,6 +81,19 @@ resolve_ipv4() {
             for (i = 1; i <= NF; i++)
                 if ($i ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) print $i
         }'
+}
+
+# 進飛行模式（關 Wi-Fi）。-i：wirelessEnable 是整數屬性（KOReader frontend/device/kindle/device.lua 同寫法）
+airplane_on() { lipc-set-prop -i com.lab126.cmd wirelessEnable 0 2>/dev/null; }
+
+# 寫入系統分區的共用流程：mntroot rw → 動作 → mntroot ro
+# 為什麼一定要 ro 回去：根目錄平常唯讀，留在 rw 狀態萬一斷電可能損毀系統分區
+with_rootfs_rw() {
+    mntroot rw || { log "ERROR: mntroot rw failed" "錯誤：mntroot rw 失敗"; return 1; }
+    "$@"
+    rc=$?
+    mntroot ro
+    return $rc
 }
 
 # Wi-Fi 連線狀態（CONNECTED／NA／READY／PENDING…）；wifid 還沒起來時是空字串

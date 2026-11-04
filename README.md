@@ -55,6 +55,9 @@ Kindle drive (root)
             ├── disable.sh
             ├── autostart_install.sh
             ├── autostart_remove.sh
+            ├── airplane_install.sh
+            ├── airplane_remove.sh
+            ├── airplane_apply.sh
             └── diagnose.sh
 ```
 
@@ -78,6 +81,8 @@ Firewall ▸
     Disable Firewall (Allow WAN)
     Install Autostart (enable on boot)
     Remove Autostart
+    Install Airplane-on-Boot (Wi-Fi off at every boot)
+    Remove Airplane-on-Boot
     Diagnose (write diagnose.txt)
 ```
 
@@ -87,6 +92,8 @@ Firewall ▸
 | **Disable Firewall** | Removes all blocking rules and allows all traffic again. |
 | **Install Autostart** | Installs a boot job (`/etc/upstart/firewall.conf`) so the firewall turns on at every boot, before Wi-Fi and the OTA service start. This writes to the Kindle's system partition. |
 | **Remove Autostart** | Deletes that boot job. |
+| **Install Airplane-on-Boot** | Optional second layer. Turns on airplane mode (Wi-Fi off) during every shutdown, and again right after boot as a safety net (e.g. after the battery died). The Kindle remembers airplane mode across reboots, so it starts with Wi-Fi off and never connects on its own. **Side effect: Wi-Fi is off after every boot — turn it on yourself when you need it.** Writes two small boot jobs to the system partition. Independent of Autostart: the firewall already starts before Wi-Fi, so this is extra protection, not a requirement. |
+| **Remove Airplane-on-Boot** | Deletes those two boot jobs. Wi-Fi then behaves normally at boot again. |
 | **Diagnose** | Writes system information to `diagnose.txt` (read-only, changes nothing). Then, for 2 minutes in the background, records Wi-Fi events to `diagnose_wifi_events.txt` — turn Wi-Fi off and on again during that time. Used for troubleshooting and for customizing the extension for another model. |
 
 ## What exactly is allowed
@@ -136,6 +143,7 @@ Things to know:
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | Wi-Fi events recorded for 2 minutes after **Diagnose**. |
 | `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
+| `firewall_airplane_shutdown.conf`, `firewall_airplane_boot.conf` | `/etc/upstart/` (system partition) | Only after **Install Airplane-on-Boot**. The shutdown one runs only during a real shutdown/reboot and is limited to 10 s, so it can't hang shutdown. |
 
 `WIFI_NO_NET_PROBE` at the drive root is not created by the extension — it comes in the zip (see [Installation](#installation)).
 
@@ -160,12 +168,12 @@ Nothing is written while Wi-Fi is off — the extension just waits. If you see `
 - **IP addresses can change**, especially for sites behind Cloudflare/CDNs. They are looked up again each time Wi-Fi reconnects; if downloads fail while staying connected for a long time, turn Wi-Fi off and on (or press Enable again).
 - **IPv4 only.** The tested Kindle has no IPv6 (`ip6tables` not present), so IPv6 is not handled.
 - **Wi-Fi error while the firewall is on** → `WIFI_NO_NET_PROBE` is missing, misnamed, or the Kindle wasn't rebooted after adding it. See [A reboot is required](#a-reboot-is-required-after-installing).
-- **Firmware updates remove Autostart**, since they overwrite the system partition (but the firewall's purpose is to block those updates).
-- If an Autostart mistake ever stops the Kindle from booting normally, delete `/etc/upstart/firewall.conf` over SSH. The boot job is written to do nothing if the extension folder is missing.
+- **Firmware updates remove Autostart and Airplane-on-Boot**, since they overwrite the system partition (but the firewall's purpose is to block those updates).
+- If a boot job ever stops the Kindle from booting normally, delete `/etc/upstart/firewall.conf` (and `firewall_airplane_*.conf`) over SSH. The boot job is written to do nothing if the extension folder is missing.
 
 ## Uninstall
 
-1. Firewall ▸ **Remove Autostart** (if you installed it).
+1. Firewall ▸ **Remove Autostart** and **Remove Airplane-on-Boot** (if you installed them).
 2. Firewall ▸ **Disable Firewall**.
 3. Delete `extensions/firewall` over USB.
 4. Delete `WIFI_NO_NET_PROBE` from the drive root and reboot, so the Kindle checks the internet connection normally again. (Optional — keeping it does no harm.)

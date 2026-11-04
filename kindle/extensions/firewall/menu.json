@@ -25,8 +25,18 @@
           "action": "./bin/autostart_remove.sh"
         },
         {
-          "name": "Diagnose (write diagnose.txt)",
+          "name": "Install Airplane-on-Boot (Wi-Fi off at every boot)",
           "priority": 5,
+          "action": "./bin/airplane_install.sh"
+        },
+        {
+          "name": "Remove Airplane-on-Boot",
+          "priority": 6,
+          "action": "./bin/airplane_remove.sh"
+        },
+        {
+          "name": "Diagnose (write diagnose.txt)",
+          "priority": 7,
           "action": "./bin/diagnose.sh"
         }
       ]

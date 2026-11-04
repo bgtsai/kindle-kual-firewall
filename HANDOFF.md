@@ -47,3 +47,4 @@
 - 2026-11-04 v1.10：第 3 項完成（等 cmStateChange→CONNECTED 才解析、FW_ALLOW 鏈每次連線重建、同 IP 只加一次、lipc 失敗時退回輪詢）；區網改放行 RFC 1918 三段（使用者同意）。log 改成每次連線一行摘要，超過 100 KB 自動截半。
 - 5.13.5 實測（diagnose）：連上 `cmStateChange "CONNECTED"`／`InternetConnected 1`；斷線 `cmDisconnected`＋`cmStateChange "NA"`；飛行模式 `wirelessEnableChanged 0/1`（com.lab126.cmd）；`cmConnected` 連線中每 ~30 秒重複。關機 `shutdown.conf`（runlevel [06]）先寫 /tmp/shutdown_in_progress 再停 `x wifid wifis lab126…`。**飛行模式會跨重開機保留**（使用者實測）。
 - 第 2 項待做（動手前先問）：關機掛 `stopping wifid` 且 /tmp/shutdown_in_progress 存在時設 wirelessEnable 0（加 timeout，不能卡關機）；開機掛 `started cmd`，等 lipc 回應再設 0；做成獨立選單 Install／Remove Airplane-on-Boot。
+- 2026-11-04 v1.11：第 2 項完成（Install／Remove Airplane-on-Boot，兩個 upstart 設定：關機 `stopping wifid`＋/tmp/shutdown_in_progress、開機 `started cmd`）。三項都已實作，等使用者實機測 v1.10＋v1.11 通過後刪除本檔。
