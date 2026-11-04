@@ -52,3 +52,5 @@
 - 2026-11-04 v1.12：net_up() 在 cmState 讀不到時改看 wlan0 IP＋DNS；每次等事件最多 300 秒；重試不提前放棄；log 記下狀態、每輪失敗與 nslookup 錯誤、背景程序啟動／被結束；Diagnose 加「background process」段。待使用者照測試流程（重開機→關飛航等 1 分→切 Wi-Fi 等 1 分→Diagnose）回傳 firewall.log＋diagnose.txt。
 - 2026-11-04 實測 v1.12：背景程序正常、每次斷線／連上都有反應；但開機後第一次連線 `dns=` 空（resolv.conf 無 nameserver）一分鐘以上→全部解析失敗，休眠喚醒續約後才恢復。推測 DHCP 廣播（255.255.255.255:67）被 DROP。
 - 2026-11-04 v1.13：放行 DHCP 廣播；refresh_allow 先等 DNS 伺服器出現（最多 300 秒）再解析。待使用者重開機測：開機後第一次連線 dns= 是否立刻有值、是否一次放行 12 個網域。
+- 2026-11-04 實測 v1.13：DHCP 推測被否定（放行後開機 dns= 仍空 5 分鐘；DHCP 用原始封包本來就不經 iptables）。
+- 2026-11-04 v1.14：拿掉 DHCP 規則；等 DNS 60 秒仍無 → 寫 dns_debug.txt（resolv.conf 連結／內容、/etc/resolv.d、DHCP 相關程序、路由、向閘道查詢、syslog）並改向預設閘道查詢。另請使用者在該狀態下測 KOReader 能否連 OTA。

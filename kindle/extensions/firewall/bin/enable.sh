@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall enable.sh v1.13
+# firewall enable.sh v1.14
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
@@ -16,7 +16,6 @@ for net in $LAN_RANGES; do
 done
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
-iptables -A OUTPUT -p udp -d 255.255.255.255 --dport "$DHCP_SERVER_PORT" -j ACCEPT
 for port in $CALIBRE_BROADCAST_PORTS; do
     iptables -A OUTPUT -p udp -d 255.255.255.255 --dport "$port" -j ACCEPT
 done
@@ -27,13 +26,47 @@ iptables -A OUTPUT -j "$ALLOW_CHAIN"
 iptables -A OUTPUT -j DROP
 log "Basic rules applied (WAN blocked)" "基本規則已套用（WAN 已阻斷）"
 
+# ---- 沒有 DNS 伺服器時的證據：誰該寫 DNS 設定、寫到哪、向路由器直接查得到嗎 ----
+dns_debug_snapshot() {
+    gw="$(default_gateway)"
+    {
+        echo "firewall dns_debug v1.14  $(date)"
+        echo "$(net_desc) gateway=$gw"
+        echo; echo "===== resolv.conf (link target + content) ====="
+        ls -la /etc/resolv.conf 2>&1
+        readlink -f /etc/resolv.conf 2>&1
+        cat /etc/resolv.conf 2>&1
+        echo; echo "===== /etc/resolv.d ====="
+        ls -la /etc/resolv.d 2>&1
+        for f in /etc/resolv.d/* /var/run/resolv* /var/run/*.resolv* /tmp/resolv*; do
+            [ -e "$f" ] && { echo "--- $f"; cat "$f" 2>&1; }
+        done
+        echo; echo "===== dhcp / dns related processes ====="
+        ps 2>&1 | grep -i -E 'dhcp|dns|resolv|wpa|wifid|cmd' | grep -v grep
+        echo; echo "===== route / wlan0 ====="
+        cat /proc/net/route 2>&1
+        ifconfig wlan0 2>&1
+        echo; echo "===== nslookup github.com (default) ====="
+        nslookup github.com 2>&1
+        echo; echo "===== nslookup github.com $gw (gateway) ====="
+        nslookup github.com "$gw" 2>&1
+        echo; echo "===== lipc ====="
+        for p in cmState enable; do printf 'wifid %s: ' "$p"; lipc-get-prop com.lab126.wifid "$p" 2>&1; done
+        echo; echo "===== iptables OUTPUT counters ====="
+        iptables -L OUTPUT -n -v 2>&1
+        echo; echo "===== syslog: dhcp / resolv / dns (last 60) ====="
+        grep -i -E 'dhcp|resolv|dns|nameserver' /var/log/messages 2>&1 | tail -n 60
+    } > "$DNS_DEBUG" 2>&1
+}
+
 # ---- 放行網域：清空 FW_ALLOW 後重新解析；連上後失敗的網域固定重試 ----
 # 同一個 IP 只加一次（ota／build.koreader.rocks、兩個 GitHub 下載網域共用 IP）
 # 為什麼重試期間不再因「狀態不是 CONNECTED」提前放棄：v1.11 開機後第一次連線 12 個全部失敗、
 # 而且沒有完整重試就停了；固定試完，最多多花一分鐘。
 refresh_allow() {
     log "Wi-Fi up, resolving ($(net_desc))" "Wi-Fi 已連上，開始查詢放行網域（狀態見上一行）"
-    # 還沒有 DNS 伺服器時先等，不要在必定失敗的狀態下把重試次數用光
+    # 還沒有 DNS 伺服器時先等；等不到就留證據，改向預設閘道查詢
+    srv=""
     if [ -z "$(dns_server)" ]; then
         waited=0
         while [ -z "$(dns_server)" ] && [ "$waited" -lt "$DNS_WAIT_MAX_S" ]; do
@@ -41,6 +74,11 @@ refresh_allow() {
             waited=$((waited + RESOLVE_RETRY_INTERVAL))
         done
         log "Waited ${waited}s for a DNS server ($(net_desc))" "等待 DNS 伺服器設定（等待秒數與結果見上一行）"
+        if [ -z "$(dns_server)" ]; then
+            dns_debug_snapshot
+            srv="$(default_gateway)"
+            log "No DNS server configured; querying gateway '$srv' directly. Details: dns_debug.txt" "系統沒有 DNS 伺服器設定，改向路由器直接查詢；細節寫在 dns_debug.txt"
+        fi
     fi
     iptables -F "$ALLOW_CHAIN"
     added=" "
@@ -51,7 +89,7 @@ refresh_allow() {
         try=$((try + 1))
         still=""
         for d in $pending; do
-            ips="$(resolve_ipv4 "$d")"
+            ips="$(resolve_ipv4 "$d" $srv)"
             if [ -z "$ips" ]; then
                 still="$still $d"
                 continue
@@ -68,7 +106,7 @@ refresh_allow() {
         pending="$(echo $still)"
         if [ -n "$pending" ]; then
             first="${pending%% *}"
-            err="$(nslookup "$first" 2>&1 | tail -n 1)"
+            err="$(nslookup "$first" $srv 2>&1 | tail -n 1)"
             log "Round $try/$RESOLVE_RETRY_MAX: $(echo $pending | wc -w) not resolved ($(net_desc)); nslookup $first: $err" "第 $try 輪：仍有網域查不到（細節見上一行）"
             [ "$try" -lt "$RESOLVE_RETRY_MAX" ] && sleep "$RESOLVE_RETRY_INTERVAL"
         fi

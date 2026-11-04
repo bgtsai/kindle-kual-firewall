@@ -105,7 +105,6 @@ Firewall ▸
 | DNS (port 53) | To any DNS server |
 | HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
 | UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So a calibre wireless-connection plugin on the Kindle can find calibre on your computer. See [Why these sites are allowed](#why-these-sites-are-allowed). |
-| DHCP: UDP broadcast to `255.255.255.255`, port `67` | So the Kindle can get its IP address and DNS server from your router when Wi-Fi connects. Without it, right after boot the Kindle had no DNS server for minutes and nothing could be looked up. Stays inside your local network. |
 | Replies to allowed connections | |
 
 Everything else outbound is dropped.
@@ -142,6 +141,7 @@ Things to know:
 | --- | --- | --- |
 | `firewall.log` | `extensions/firewall/firewall.log` | One line per action: rules applied, sites allowed, autostart installed, errors. |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
+| `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | Written automatically only when Wi-Fi is connected but the Kindle has no DNS server for 60 s. The extension then looks up the allowed sites through your router directly. Send this file when reporting problems. |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | Wi-Fi events recorded for 2 minutes after **Diagnose**. |
 | `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
 | `firewall_airplane_shutdown.conf`, `firewall_airplane_boot.conf` | `/etc/upstart/` (system partition) | Only after **Install Airplane-on-Boot**. The shutdown one runs only during a real shutdown/reboot and is limited to 10 s, so it can't hang shutdown. |

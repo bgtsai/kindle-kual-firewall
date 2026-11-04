@@ -105,7 +105,6 @@ Firewall ▸
 | DNS（53 埠） | 任何 DNS 伺服器 |
 | 連到 KOReader 相關網站的 HTTP 與 HTTPS，清單見[為什麼放行這些網站](#為什麼放行這些網站) | 按下 Enable 後查到的 IP |
 | UDP 廣播到 `255.255.255.255`，埠 `54982 48123 39001 44044 59678` | 讓 Kindle 上的 calibre 無線連線插件找得到電腦上的 calibre，見[為什麼放行這些網站](#為什麼放行這些網站)。 |
-| DHCP：UDP 廣播到 `255.255.255.255`，埠 `67` | 讓 Kindle 連上 Wi-Fi 時能向路由器拿到 IP 與 DNS 伺服器。沒有放行時，開機後好幾分鐘都沒有 DNS 伺服器，什麼網址都查不到。只在區域網路內。 |
 | 已放行連線的回應 | |
 
 其他所有對外流量都擋掉。
@@ -142,6 +141,7 @@ Firewall ▸
 | --- | --- | --- |
 | `firewall.log` | `extensions/firewall/firewall.log` | 每個動作一行：規則已套用、網站已放行、開機設定已安裝、錯誤訊息。 |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | **Diagnose** 的輸出。 |
+| `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | 只有在 Wi-Fi 已連上、但 Kindle 60 秒內都沒有 DNS 伺服器設定時，才會自動產生；這時插件會改成直接向路由器查詢放行網站。回報問題時請附上這個檔。 |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | 按 **Diagnose** 後 2 分鐘內錄到的 Wi-Fi 事件。 |
 | `firewall.conf` | `/etc/upstart/firewall.conf`（系統分區，USB 看不到） | 開機設定，按過 **Install Autostart** 才會有。 |
 | `firewall_airplane_shutdown.conf`、`firewall_airplane_boot.conf` | `/etc/upstart/`（系統分區） | 按過 **Install Airplane-on-Boot** 才會有。關機那個只在真的關機／重開機時執行，而且最多 10 秒，不會卡住關機。 |
