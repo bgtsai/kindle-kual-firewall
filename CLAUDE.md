@@ -15,8 +15,8 @@ kindle/
         ├── menu.json             one top-level "Firewall" item; all actions in its "items" submenu
         └── bin/
             ├── common.sh         shared paths, ALLOW_DOMAINS, resolve_ipv4(), log(), notify()
-            ├── enable.sh         base rules now, allow-list (KOReader OTA + dictionary hosts) added later by a background retry loop
-            ├── disable.sh        stop retry loop, flush OUTPUT, policy ACCEPT
+            ├── enable.sh         base rules now; background process waits for Wi-Fi (cmStateChange → CONNECTED) and rebuilds the FW_ALLOW chain
+            ├── disable.sh        stop background process + its lipc-wait-event, flush OUTPUT, delete FW_ALLOW, policy ACCEPT
             ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
             ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
             └── diagnose.sh       read-only; writes firewall/diagnose.txt, then records Wi-Fi/cmd lipc events for 120 s in background → diagnose_wifi_events.txt
@@ -36,16 +36,17 @@ Always deliver the result as `firewall.zip` whose top level is `extensions/` + `
 | Root fs read-only | `autostart_*.sh` | `mounts`: `/dev/root on / ... (ro,...)` → `mntroot rw/ro` needed. Check `mntroot` exists in `tools`. |
 | Wi-Fi connectivity probe | `kindle/WIFI_NO_NET_PROBE` | Kindle probes `spectrum.s3.amazonaws.com/kindle-wifi/wifistub.html` after joining Wi-Fi; the firewall blocks it → Wi-Fi error. The flag file disables the probe (confirmed on 5.13.5; read only when wifid starts → reboot needed). If the user's Kindle ignores the flag, look for how `wifid.conf` builds its arguments. Do **not** solve it by allowing S3 IPs: firmware updates are also on S3. |
 | calibre broadcast | `common.sh` `CALIBRE_BROADCAST_PORTS`, `enable.sh` | OUTPUT UDP to `255.255.255.255` on calibre's 5 broadcast ports (UNCaGED hard-codes 255.255.255.255). INPUT (calibre's reply) is the calibre plugin's job, not this firewall's. |
-| LAN range | `enable.sh` | User's network may be `10.0.0.0/8` or `172.16.0.0/12` instead of `192.168.0.0/16`. Ask. |
+| LAN range | `common.sh` `LAN_RANGES` | All three RFC 1918 ranges are allowed. Don't add 100.64.0.0/10 (CGNAT), 169.254/16, multicast without a concrete need. |
 
 Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptables` at `/usr/sbin/iptables`, no `ip6tables`.
 
 ## Design decisions (don't undo without a reason)
 
-- **Base rules first, allow-list later.** With Wi-Fi off, DNS fails; the old version then added no allow rule and never recovered. Allow rules are inserted with `-I OUTPUT 1` so they sit before the final DROP.
+- **Base rules first, allow-list later.** With Wi-Fi off, DNS fails; the old version then added no allow rule and never recovered. Allow rules live in chain `FW_ALLOW` (OUTPUT jumps to it before DROP); each Wi-Fi connect flushes and rebuilds it, one rule pair per unique IP.
+- **Event-driven, not polling.** The background process blocks in `lipc-wait-event -s 0 com.lab126.wifid cmStateChange` and resolves only on a transition to `CONNECTED` (read via `lipc-get-prop com.lab126.wifid cmState`). Don't trigger on `cmConnected`: it repeats every ~30 s while connected (5.13.5). If lipc-wait-event fails (wifid not up yet at boot), fall back to polling every `WAIT_FALLBACK_POLL_S`.
 - **Allow-list = what KOReader actually contacts** (OTA servers from `otamanager.lua`, dictionary hosts from `dictionaries.lua`), ports 80 and 443. Before adding a host, check it in KOReader's source and test for redirects (`curl -sI`); github.com release downloads redirect to `release-assets.githubusercontent.com`. Keep README's "Why these sites are allowed" table in sync.
 - **Boot job must never block boot.** It only calls `enable.sh` if the file exists, and `enable.sh` backgrounds the slow part. Keep it a `task` on `starting lab126` so it finishes before Wi-Fi/OTA start.
-- **Retry loop is single-instance** via `/var/run/firewall_resolver.pid`; Enable and Disable kill the previous one.
+- **Background process is single-instance** via `/var/run/firewall_resolver.pid` (+ `firewall_waiter.pid` for its current lipc-wait-event); Enable and Disable kill both.
 - Errors are written to `firewall.log`, never silently swallowed.
 - **Bilingual log**: `log "<English>" "<中文>"` writes an English line with timestamp, then an indented `Chinese | …` line. Data (domains, IPs, paths) goes only in the English line. Every new log call must pass both strings; update README "Checking that it works" if messages change.
 

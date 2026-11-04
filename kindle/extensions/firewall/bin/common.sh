@@ -1,9 +1,11 @@
 #!/bin/sh
-# firewall common.sh v1.9 — 各腳本共用的路徑與函式
+# firewall common.sh v1.10 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
 PIDFILE="/var/run/firewall_resolver.pid"
+# 背景程序目前正在等的 lipc-wait-event，Disable 時要一併停掉
+WAITER_PIDFILE="/var/run/firewall_waiter.pid"
 UPSTART_CONF="/etc/upstart/firewall.conf"
 
 # 允許連線的網域，HTTP (80) 與 HTTPS (443) 都放行。
@@ -28,6 +30,12 @@ objects.githubusercontent.com
 cyphar.github.io
 "
 ALLOW_PORTS="80 443"
+# 放行網域的規則都放在這條鏈，OUTPUT 在 DROP 前跳過來；Wi-Fi 重新連上時整條清空重建，舊 IP 不殘留
+ALLOW_CHAIN="FW_ALLOW"
+
+# 區域網路：RFC 1918 三段私有網段，網際網路上不會被路由，不可能是 Amazon 的伺服器。
+# 不放 100.64.0.0/10（電信業者 CGNAT，不在家裡）、169.254.0.0/16（DHCP 失敗才出現）、群播。
+LAN_RANGES="192.168.0.0/16 10.0.0.0/8 172.16.0.0/12"
 
 # calibre 無線連線（給 kindle-kual-calibre-wireless 插件）找 calibre 用的 UDP 廣播。
 # UNCaGED 把目標寫死成 255.255.255.255（calibre/calibre.go）；埠號＝calibre
@@ -35,15 +43,21 @@ ALLOW_PORTS="80 443"
 # 由那個插件自己在連線期間開、斷線時關，不放在這裡。
 CALIBRE_BROADCAST_PORTS="54982 48123 39001 44044 59678"
 
-# 背景重試解析的間隔 (s)
-RESOLVE_RETRY_INTERVAL=30
-# 還有網域沒解析成功時，每隔幾輪在 log 記一次清單（避免每 30 秒寫一行）
-RESOLVE_PENDING_LOG_ROUNDS=10
+# Wi-Fi 連上後，還有網域解析失敗時的重試間隔 (s) 與次數；用完就停，等下一次連線
+RESOLVE_RETRY_INTERVAL=10
+RESOLVE_RETRY_MAX=6
+# lipc-wait-event 無法使用時（例如開機初期 wifid 還沒起來）改用輪詢的間隔 (s)
+WAIT_FALLBACK_POLL_S=30
+# firewall.log 超過這個大小 (bytes) 就只保留後半段；每次 Wi-Fi 重連都會寫 log
+LOG_MAX_BYTES=100000
 
 # 雙語 log：log "<English>" "<中文>"
 # 英文行帶時間；中文行縮排、以「Chinese | 」開頭，看不懂中文的人一眼知道可以跳過。
 # 網域、IP、路徑只放英文行，中文行不重複，避免兩邊內容不一致。
 log() {
+    if [ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt "$LOG_MAX_BYTES" ]; then
+        tail -c $((LOG_MAX_BYTES / 2)) "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+    fi
     ts="$(date '+%Y-%m-%d %H:%M:%S')"
     echo "$ts  $1" >> "$LOG"
     [ -n "$2" ] && echo "                     Chinese | $2" >> "$LOG"
@@ -64,10 +78,15 @@ resolve_ipv4() {
         }'
 }
 
-# 停掉先前留下的背景解析程序（重按 Enable 或 Disable 時用）
+# Wi-Fi 連線狀態（CONNECTED／NA／READY／PENDING…）；wifid 還沒起來時是空字串
+wifi_state() { lipc-get-prop com.lab126.wifid cmState 2>/dev/null; }
+
+# 停掉先前留下的背景程序與它正在等的 lipc-wait-event（重按 Enable 或 Disable 時用）
 stop_resolver() {
-    if [ -f "$PIDFILE" ]; then
-        kill "$(cat "$PIDFILE")" 2>/dev/null
-        rm -f "$PIDFILE"
-    fi
+    for f in "$PIDFILE" "$WAITER_PIDFILE"; do
+        if [ -f "$f" ]; then
+            kill "$(cat "$f")" 2>/dev/null
+            rm -f "$f"
+        fi
+    done
 }

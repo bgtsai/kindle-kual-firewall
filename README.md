@@ -4,7 +4,7 @@
 
 A KUAL extension for jailbroken Kindles. It blocks all outbound internet traffic — including Amazon OTA firmware updates — while still allowing:
 
-- your local network (`192.168.x.x`)
+- your local network (`192.168.x.x`, `10.x.x.x`, `172.16–31.x.x`)
 - DNS lookups
 - KOReader's own update servers and dictionary download sites (so KOReader can still update itself and download dictionaries) — see [Why these sites are allowed](#why-these-sites-are-allowed)
 
@@ -83,7 +83,7 @@ Firewall ▸
 
 | Item | What it does |
 | --- | --- |
-| **Enable Firewall** | Blocks the internet immediately. Then keeps trying (every 30 s, in the background) to look up the IP addresses of the allowed sites, and allows them as soon as Wi-Fi is up. So it's fine to press this while Wi-Fi is off. |
+| **Enable Firewall** | Blocks the internet immediately. Then waits in the background until Wi-Fi connects, looks up the IP addresses of the allowed sites and allows them. It does this again every time Wi-Fi reconnects (so changed IPs are picked up), and stays idle in airplane mode. So it's fine to press this while Wi-Fi is off. |
 | **Disable Firewall** | Removes all blocking rules and allows all traffic again. |
 | **Install Autostart** | Installs a boot job (`/etc/upstart/firewall.conf`) so the firewall turns on at every boot, before Wi-Fi and the OTA service start. This writes to the Kindle's system partition. |
 | **Remove Autostart** | Deletes that boot job. |
@@ -94,7 +94,7 @@ Firewall ▸
 | Allowed | Notes |
 | --- | --- |
 | Loopback (`lo`) | Internal communication between programs on the Kindle |
-| `192.168.0.0/16` | Your local network, any port. `10.x.x.x` and `172.16–31.x.x` are **not** allowed. |
+| `192.168.0.0/16`, `10.0.0.0/8`, `172.16.0.0/12` | Your local network, any port. These three private ranges (RFC 1918) are never routed on the internet, so no Amazon server can be in them. Not allowed: `100.64.0.0/10` (carrier-grade NAT, outside your home), `169.254.0.0/16` (only appears when DHCP fails), multicast. |
 | DNS (port 53) | To any DNS server |
 | HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
 | UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So a calibre wireless-connection plugin on the Kindle can find calibre on your computer. See [Why these sites are allowed](#why-these-sites-are-allowed). |
@@ -147,22 +147,17 @@ Things to know:
    ```
    2026-11-04 05:31:20  Basic rules applied (WAN blocked)
                         Chinese | 基本規則已套用（WAN 已阻斷）
-   2026-11-04 05:31:21  Allowed ota.koreader.rocks: 104.21.x.x 172.67.x.x
-                        Chinese | 已放行上一行的網域
-   2026-11-04 05:31:21  Allowed gitlab.com: 172.65.x.x
-                        Chinese | 已放行上一行的網域
-   …
-   2026-11-04 05:31:22  All domains allowed
-                        Chinese | 全部網域放行完成
+   2026-11-04 05:31:24  Wi-Fi connected: allowed 12 domains, IPs: 104.21.x.x 172.67.x.x 172.65.x.x …
+                        Chinese | Wi-Fi 已連上：已放行上一行的網域
    ```
    Every entry is written twice: an English line with the time, then an indented line starting with `Chinese |` — the same message in Chinese. You can skip the `Chinese |` lines.
 
-If you see `Not resolved yet, retrying: <sites>`, those sites couldn't be looked up — usually because Wi-Fi isn't connected yet. It retries every 30 s and writes this line about every 5 minutes. If only one mirror stays in that list for a long time, that mirror is probably down; everything else already works.
+Nothing is written while Wi-Fi is off — the extension just waits. If you see `Could not resolve (will retry on next connection): <sites>`, those sites couldn't be looked up even after a minute of retrying while connected; they are tried again the next time Wi-Fi connects. If it is always the same mirror, that mirror is probably down; everything else already works. `firewall.log` is trimmed automatically when it grows past about 100 KB.
 
 ## Known limitations
 
 - **Without Autostart, rules are lost on reboot.** Press Enable again, or use Install Autostart.
-- **IP addresses can change**, especially for sites behind Cloudflare/CDNs. If KOReader updates or dictionary downloads start failing later, press Enable again.
+- **IP addresses can change**, especially for sites behind Cloudflare/CDNs. They are looked up again each time Wi-Fi reconnects; if downloads fail while staying connected for a long time, turn Wi-Fi off and on (or press Enable again).
 - **IPv4 only.** The tested Kindle has no IPv6 (`ip6tables` not present), so IPv6 is not handled.
 - **Wi-Fi error while the firewall is on** → `WIFI_NO_NET_PROBE` is missing, misnamed, or the Kindle wasn't rebooted after adding it. See [A reboot is required](#a-reboot-is-required-after-installing).
 - **Firmware updates remove Autostart**, since they overwrite the system partition (but the firewall's purpose is to block those updates).
