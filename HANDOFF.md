@@ -48,3 +48,5 @@
 - 5.13.5 實測（diagnose）：連上 `cmStateChange "CONNECTED"`／`InternetConnected 1`；斷線 `cmDisconnected`＋`cmStateChange "NA"`；飛行模式 `wirelessEnableChanged 0/1`（com.lab126.cmd）；`cmConnected` 連線中每 ~30 秒重複。關機 `shutdown.conf`（runlevel [06]）先寫 /tmp/shutdown_in_progress 再停 `x wifid wifis lab126…`。**飛行模式會跨重開機保留**（使用者實測）。
 - 第 2 項待做（動手前先問）：關機掛 `stopping wifid` 且 /tmp/shutdown_in_progress 存在時設 wirelessEnable 0（加 timeout，不能卡關機）；開機掛 `started cmd`，等 lipc 回應再設 0；做成獨立選單 Install／Remove Airplane-on-Boot。
 - 2026-11-04 v1.11：第 2 項完成（Install／Remove Airplane-on-Boot，兩個 upstart 設定：關機 `stopping wifid`＋/tmp/shutdown_in_progress、開機 `started cmd`）。三項都已實作，等使用者實機測 v1.10＋v1.11 通過後刪除本檔。
+- 2026-11-04 實測 v1.11：Airplane-on-Boot 關機段、開機段都正常（log 有 Shutdown／Boot 兩筆）；一般連線解析正常。**問題**：Autostart 開機後第一次連線 12 個網域全失敗、之後切 Wi-Fi 背景程序完全沒反應。
+- 2026-11-04 v1.12：net_up() 在 cmState 讀不到時改看 wlan0 IP＋DNS；每次等事件最多 300 秒；重試不提前放棄；log 記下狀態、每輪失敗與 nslookup 錯誤、背景程序啟動／被結束；Diagnose 加「background process」段。待使用者照測試流程（重開機→關飛航等 1 分→切 Wi-Fi 等 1 分→Diagnose）回傳 firewall.log＋diagnose.txt。

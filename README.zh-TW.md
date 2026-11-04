@@ -155,12 +155,16 @@ Firewall ▸
    ```
    2026-11-04 05:31:20  Basic rules applied (WAN blocked)
                         Chinese | 基本規則已套用（WAN 已阻斷）
+   2026-11-04 05:31:20  Background process started (pid 1234, cmState=NA wlan0= dns=)
+                        Chinese | 背景程序已啟動（狀態見上一行）
+   2026-11-04 05:31:23  Wi-Fi up, resolving (cmState=CONNECTED wlan0=192.168.1.50 dns=192.168.1.1)
+                        Chinese | Wi-Fi 已連上，開始查詢放行網域（狀態見上一行）
    2026-11-04 05:31:24  Wi-Fi connected: allowed 12 domains, IPs: 104.21.x.x 172.67.x.x 172.65.x.x …
                         Chinese | Wi-Fi 已連上：已放行上一行的網域
    ```
    每筆紀錄寫兩行：第一行是英文、帶時間；下一行縮排、以 `Chinese |` 開頭，是同一句的中文。網域、IP 只寫在英文那一行。
 
-Wi-Fi 關著時什麼都不會寫，插件只是在等。如果看到 `Could not resolve (will retry on next connection): <網站>`（中文行是「上一行的網域解析失敗，下次連上 Wi-Fi 時再試」），代表連上後重試約一分鐘仍查不到，下次連上 Wi-Fi 會再試。如果每次都是同一個鏡像，多半是那個鏡像掛了，其他網站已經可以用。`firewall.log` 超過約 100 KB 會自動只保留後半段。
+Wi-Fi 關著時插件只是在等（保險起見至少每 5 分鐘醒來檢查一次）。出問題時，`Wi-Fi down`、`Round n/6: … not resolved` 這幾行會記下經過，`Round` 那行最後的 `nslookup` 錯誤訊息最有參考價值。如果看到 `Could not resolve (will retry on next connection): <網站>`（中文行是「上一行的網域解析失敗，下次連上 Wi-Fi 時再試」），代表連上後重試約一分鐘仍查不到，下次連上 Wi-Fi 會再試。如果每次都是同一個鏡像，多半是那個鏡像掛了，其他網站已經可以用。`firewall.log` 超過約 100 KB 會自動只保留後半段。
 
 ## 已知限制
 

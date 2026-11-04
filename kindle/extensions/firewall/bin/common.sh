@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.11 — 各腳本共用的路徑與函式
+# firewall common.sh v1.12 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -53,6 +53,11 @@ RESOLVE_RETRY_INTERVAL=10
 RESOLVE_RETRY_MAX=6
 # lipc-wait-event 無法使用時（例如開機初期 wifid 還沒起來）改用輪詢的間隔 (s)
 WAIT_FALLBACK_POLL_S=30
+# 每次等事件最多等多久 (s)。保險：萬一 lipc-wait-event 卡住收不到事件（v1.11 開機後實測疑似發生），
+# 至少每這麼久會醒來重新檢查一次連線狀態。飛行模式時就是每這麼久醒一次，耗電可忽略。
+WAIT_MAX_S=300
+# lipc-wait-event 在這麼短的時間內就結束且失敗，視為「不能用」，改用輪詢 (s)
+WAIT_FAST_FAIL_S=2
 # firewall.log 超過這個大小 (bytes) 就只保留後半段；每次 Wi-Fi 重連都會寫 log
 LOG_MAX_BYTES=100000
 
@@ -96,8 +101,30 @@ with_rootfs_rw() {
     return $rc
 }
 
-# Wi-Fi 連線狀態（CONNECTED／NA／READY／PENDING…）；wifid 還沒起來時是空字串
+# Wi-Fi 連線狀態（CONNECTED／NA／READY／PENDING…）；讀不到時是空字串
 wifi_state() { lipc-get-prop com.lab126.wifid cmState 2>/dev/null; }
+
+# wlan0 的 IPv4 位址；沒有就空字串
+wlan_ip() {
+    ifconfig wlan0 2>/dev/null | awk '/inet addr:/ { sub("addr:", "", $2); print $2; exit }'
+}
+
+# 目前設定的 DNS 伺服器（resolv.conf 第一個 nameserver）；沒有就空字串
+dns_server() { awk '/^nameserver/ { print $2; exit }' /etc/resolv.conf 2>/dev/null; }
+
+# 一行描述目前網路狀態，寫 log 用
+net_desc() { echo "cmState=$(wifi_state) wlan0=$(wlan_ip) dns=$(dns_server)"; }
+
+# 判斷 Wi-Fi 是否已連上。
+# 主要看 cmState；但 cmState 讀不到（空值）時不能就當成沒連上——v1.11 開機後實測，
+# 疑似因為讀不到狀態而一直判斷成「沒連上」，切 Wi-Fi 也沒反應。這時改看 wlan0 有 IP 且有 DNS 伺服器。
+# cmState 明確不是 CONNECTED（NA、READY…）時照它判斷。
+net_up() {
+    st="$(wifi_state)"
+    [ "$st" = CONNECTED ] && return 0
+    [ -n "$st" ] && return 1
+    [ -n "$(wlan_ip)" ] && [ -n "$(dns_server)" ]
+}
 
 # 停掉先前留下的背景程序與它正在等的 lipc-wait-event（重按 Enable 或 Disable 時用）
 stop_resolver() {

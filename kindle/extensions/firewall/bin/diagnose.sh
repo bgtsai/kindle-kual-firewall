@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall diagnose.sh v1.11
+# firewall diagnose.sh v1.12
 # 收集寫開機自動執行、IPv6 阻擋、飛行模式、Wi-Fi 事件所需的資訊，結果寫到使用者區：
 #   extensions/firewall/diagnose.txt             一次性的系統資訊
 #   extensions/firewall/diagnose_wifi_events.txt 按下後 WIFI_EVENT_RECORD_S 秒內的 Wi-Fi 事件
@@ -17,7 +17,7 @@ WIFI_POLL_INTERVAL_S=3
 section() { echo; echo "===== $1 ====="; }
 
 {
-    echo "firewall diagnose v1.11  $(date)"
+    echo "firewall diagnose v1.12  $(date)"
 
     section "firmware / kernel"
     cat /etc/prettyversion.txt 2>&1
@@ -74,6 +74,19 @@ section() { echo; echo "===== $1 ====="; }
     section "firewall autostart"
     ls -l /etc/upstart/firewall.conf 2>&1 && cat /etc/upstart/firewall.conf
 
+    section "firewall background process"
+    for f in /var/run/firewall_resolver.pid /var/run/firewall_waiter.pid; do
+        if [ -f "$f" ]; then
+            p="$(cat "$f")"
+            if kill -0 "$p" 2>/dev/null; then echo "$f: pid $p running"; else echo "$f: pid $p NOT running"; fi
+        else
+            echo "$f: (no pid file)"
+        fi
+    done
+    ps 2>&1 | grep -E 'enable\.sh|lipc-wait-event|timeout' | grep -v grep
+    printf 'wlan0 IPv4: '; ifconfig wlan0 2>&1 | awk '/inet addr:/ {print $2}'
+    echo "FW_ALLOW rules: $(iptables -S FW_ALLOW 2>/dev/null | grep -c ACCEPT)"
+
     section "firewall Airplane-on-Boot"
     for f in /etc/upstart/firewall_airplane_shutdown.conf /etc/upstart/firewall_airplane_boot.conf; do
         ls -l "$f" 2>&1 && cat "$f"
@@ -91,7 +104,7 @@ section() { echo; echo "===== $1 ====="; }
 # ---- 背景錄製 Wi-Fi 事件：不拖住 KUAL，時間到自動結束 ----
 (
     {
-        echo "firewall wifi events v1.11  start $(date)"
+        echo "firewall wifi events v1.12  start $(date)"
         echo "Turn Wi-Fi OFF and ON again within ${WIFI_EVENT_RECORD_S}s."
         echo
     } > "$EVENTS"

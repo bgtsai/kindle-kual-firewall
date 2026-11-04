@@ -155,12 +155,16 @@ Things to know:
    ```
    2026-11-04 05:31:20  Basic rules applied (WAN blocked)
                         Chinese | 基本規則已套用（WAN 已阻斷）
+   2026-11-04 05:31:20  Background process started (pid 1234, cmState=NA wlan0= dns=)
+                        Chinese | 背景程序已啟動（狀態見上一行）
+   2026-11-04 05:31:23  Wi-Fi up, resolving (cmState=CONNECTED wlan0=192.168.1.50 dns=192.168.1.1)
+                        Chinese | Wi-Fi 已連上，開始查詢放行網域（狀態見上一行）
    2026-11-04 05:31:24  Wi-Fi connected: allowed 12 domains, IPs: 104.21.x.x 172.67.x.x 172.65.x.x …
                         Chinese | Wi-Fi 已連上：已放行上一行的網域
    ```
    Every entry is written twice: an English line with the time, then an indented line starting with `Chinese |` — the same message in Chinese. You can skip the `Chinese |` lines.
 
-Nothing is written while Wi-Fi is off — the extension just waits. If you see `Could not resolve (will retry on next connection): <sites>`, those sites couldn't be looked up even after a minute of retrying while connected; they are tried again the next time Wi-Fi connects. If it is always the same mirror, that mirror is probably down; everything else already works. `firewall.log` is trimmed automatically when it grows past about 100 KB.
+While Wi-Fi is off the extension just waits (it checks again at least every 5 minutes as a safety net). `Wi-Fi down` / `Round n/6: … not resolved` lines show what happened if something goes wrong — the `nslookup` error at the end of a `Round` line is the useful part. If you see `Could not resolve (will retry on next connection): <sites>`, those sites couldn't be looked up even after a minute of retrying while connected; they are tried again the next time Wi-Fi connects. If it is always the same mirror, that mirror is probably down; everything else already works. `firewall.log` is trimmed automatically when it grows past about 100 KB.
 
 ## Known limitations
 
