@@ -103,6 +103,7 @@ Firewall ▸
 | Loopback (`lo`) | Internal communication between programs on the Kindle |
 | `192.168.0.0/16`, `10.0.0.0/8`, `172.16.0.0/12` | Your local network, any port. These three private ranges (RFC 1918) are never routed on the internet, so no Amazon server can be in them. Not allowed: `100.64.0.0/10` (carrier-grade NAT, outside your home), `169.254.0.0/16` (only appears when DHCP fails), multicast. |
 | DNS (port 53) | To any DNS server |
+| NTP (UDP port 123) | To any time server. Lets [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) set the Kindle's clock from `pool.ntp.org` (volunteer time servers, not Amazon). Open to any host because `pool.ntp.org` gives different IPs on every lookup. NTP only carries the time, so this doesn't open a path for firmware updates. |
 | HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
 | UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So a calibre wireless-connection plugin on the Kindle can find calibre on your computer. See [Why these sites are allowed](#why-these-sites-are-allowed). |
 | Replies to allowed connections | |

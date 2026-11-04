@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall enable.sh v1.15
+# firewall enable.sh v1.16
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
@@ -16,6 +16,11 @@ for net in $LAN_RANGES; do
 done
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+# 網路對時（NTP，UDP 123）：放行到任何主機。為什麼不照網域放行：pool.ntp.org 每次解析的 IP 都不同
+# （輪替），先解析再放行的 IP 跟 ntpdate 自己解析到的對不上。NTP 只交換時間，不是 OTA 的管道
+# （OTA 走 HTTPS），所以不削弱更新阻擋。用途：Kindle 長期飛行模式時鐘會停住，
+# kindle-kual-calibre-wireless 每次連線用 ntpdate pool.ntp.org 校正（同 KOReader timesync 外掛）。
+iptables -A OUTPUT -p udp --dport 123 -j ACCEPT
 for port in $CALIBRE_BROADCAST_PORTS; do
     iptables -A OUTPUT -p udp -d 255.255.255.255 --dport "$port" -j ACCEPT
 done

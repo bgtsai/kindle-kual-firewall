@@ -103,6 +103,7 @@ Firewall ▸
 | 本機（`lo`） | Kindle 內部程式之間的溝通 |
 | `192.168.0.0/16`、`10.0.0.0/8`、`172.16.0.0/12` | 區域網路，所有埠。這三段是私有網段（RFC 1918），網際網路上不會被路由，不可能是 Amazon 的伺服器。沒有放行：`100.64.0.0/10`（電信業者 CGNAT，不在你家）、`169.254.0.0/16`（DHCP 失敗時才出現）、群播。 |
 | DNS（53 埠） | 任何 DNS 伺服器 |
+| NTP（UDP 123 埠） | 任何時間伺服器。讓 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) 用 `pool.ntp.org`（志願者維護的時間伺服器，不是 Amazon）校正 Kindle 時鐘。不限主機，因為 `pool.ntp.org` 每次查到的 IP 都不同。NTP 只傳時間，不會成為韌體更新的管道。 |
 | 連到 KOReader 相關網站的 HTTP 與 HTTPS，清單見[為什麼放行這些網站](#為什麼放行這些網站) | 按下 Enable 後查到的 IP |
 | UDP 廣播到 `255.255.255.255`，埠 `54982 48123 39001 44044 59678` | 讓 Kindle 上的 calibre 無線連線插件找得到電腦上的 calibre，見[為什麼放行這些網站](#為什麼放行這些網站)。 |
 | 已放行連線的回應 | |
