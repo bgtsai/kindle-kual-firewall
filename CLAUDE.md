@@ -39,6 +39,7 @@ Always deliver the result as `firewall.zip` whose top level is `extensions/` + `
 | Root fs read-only | `autostart_*.sh` | `mounts`: `/dev/root on / ... (ro,...)` → `mntroot rw/ro` needed. Check `mntroot` exists in `tools`. |
 | Wi-Fi connectivity probe | `kindle/WIFI_NO_NET_PROBE` | Kindle probes `spectrum.s3.amazonaws.com/kindle-wifi/wifistub.html` after joining Wi-Fi; the firewall blocks it → Wi-Fi error. The flag file disables the probe (confirmed on 5.13.5; read only when wifid starts → reboot needed). If the user's Kindle ignores the flag, look for how `wifid.conf` builds its arguments. Do **not** solve it by allowing S3 IPs: firmware updates are also on S3. |
 | calibre broadcast | `common.sh` `CALIBRE_BROADCAST_PORTS`, `enable.sh` | OUTPUT UDP to `255.255.255.255` on calibre's 5 broadcast ports (UNCaGED hard-codes 255.255.255.255). INPUT (calibre's reply) is the calibre plugin's job, not this firewall's. |
+| DHCP | `common.sh` `DHCP_SERVER_PORT`, `enable.sh` | OUTPUT UDP to 255.255.255.255:67. Without it (≤ v1.12) resolv.conf had no nameserver after an autostart boot until a unicast renewal (5.13.5). `refresh_allow` also waits up to `DNS_WAIT_MAX_S` for a nameserver before using up its retries. |
 | LAN range | `common.sh` `LAN_RANGES` | All three RFC 1918 ranges are allowed. Don't add 100.64.0.0/10 (CGNAT), 169.254/16, multicast without a concrete need. |
 
 Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptables` at `/usr/sbin/iptables`, no `ip6tables`.

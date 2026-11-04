@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.12 — 各腳本共用的路徑與函式
+# firewall common.sh v1.13 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -48,9 +48,16 @@ LAN_RANGES="192.168.0.0/16 10.0.0.0/8 172.16.0.0/12"
 # 由那個插件自己在連線期間開、斷線時關，不放在這裡。
 CALIBRE_BROADCAST_PORTS="54982 48123 39001 44044 59678"
 
+# DHCP：Kindle 連上 Wi-Fi 時用廣播（255.255.255.255 的 UDP 67）向路由器要 IP 與 DNS 伺服器。
+# v1.12 以前沒放行，開機後第一次連線 resolv.conf 一直沒有 nameserver（5.13.5 實測 dns= 空了一分鐘以上），
+# 等休眠喚醒後單播續約才拿到。只在區域網路內，不會出到外網。
+DHCP_SERVER_PORT=67
+
 # Wi-Fi 連上後，還有網域解析失敗時的重試間隔 (s) 與次數；用完就停，等下一次連線
 RESOLVE_RETRY_INTERVAL=10
 RESOLVE_RETRY_MAX=6
+# 連上後還沒有 DNS 伺服器（resolv.conf 沒有 nameserver）時，最多等多久再開始解析 (s)
+DNS_WAIT_MAX_S=300
 # lipc-wait-event 無法使用時（例如開機初期 wifid 還沒起來）改用輪詢的間隔 (s)
 WAIT_FALLBACK_POLL_S=30
 # 每次等事件最多等多久 (s)。保險：萬一 lipc-wait-event 卡住收不到事件（v1.11 開機後實測疑似發生），

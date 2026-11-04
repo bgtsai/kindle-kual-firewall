@@ -105,6 +105,7 @@ Firewall ▸
 | DNS (port 53) | To any DNS server |
 | HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
 | UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So a calibre wireless-connection plugin on the Kindle can find calibre on your computer. See [Why these sites are allowed](#why-these-sites-are-allowed). |
+| DHCP: UDP broadcast to `255.255.255.255`, port `67` | So the Kindle can get its IP address and DNS server from your router when Wi-Fi connects. Without it, right after boot the Kindle had no DNS server for minutes and nothing could be looked up. Stays inside your local network. |
 | Replies to allowed connections | |
 
 Everything else outbound is dropped.

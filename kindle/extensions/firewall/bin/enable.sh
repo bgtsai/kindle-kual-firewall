@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall enable.sh v1.12
+# firewall enable.sh v1.13
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
@@ -16,6 +16,7 @@ for net in $LAN_RANGES; do
 done
 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
 iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p udp -d 255.255.255.255 --dport "$DHCP_SERVER_PORT" -j ACCEPT
 for port in $CALIBRE_BROADCAST_PORTS; do
     iptables -A OUTPUT -p udp -d 255.255.255.255 --dport "$port" -j ACCEPT
 done
@@ -32,6 +33,15 @@ log "Basic rules applied (WAN blocked)" "基本規則已套用（WAN 已阻斷�
 # 而且沒有完整重試就停了；固定試完，最多多花一分鐘。
 refresh_allow() {
     log "Wi-Fi up, resolving ($(net_desc))" "Wi-Fi 已連上，開始查詢放行網域（狀態見上一行）"
+    # 還沒有 DNS 伺服器時先等，不要在必定失敗的狀態下把重試次數用光
+    if [ -z "$(dns_server)" ]; then
+        waited=0
+        while [ -z "$(dns_server)" ] && [ "$waited" -lt "$DNS_WAIT_MAX_S" ]; do
+            sleep "$RESOLVE_RETRY_INTERVAL"
+            waited=$((waited + RESOLVE_RETRY_INTERVAL))
+        done
+        log "Waited ${waited}s for a DNS server ($(net_desc))" "等待 DNS 伺服器設定（等待秒數與結果見上一行）"
+    fi
     iptables -F "$ALLOW_CHAIN"
     added=" "
     ok=0

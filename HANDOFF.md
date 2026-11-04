@@ -50,3 +50,5 @@
 - 2026-11-04 v1.11：第 2 項完成（Install／Remove Airplane-on-Boot，兩個 upstart 設定：關機 `stopping wifid`＋/tmp/shutdown_in_progress、開機 `started cmd`）。三項都已實作，等使用者實機測 v1.10＋v1.11 通過後刪除本檔。
 - 2026-11-04 實測 v1.11：Airplane-on-Boot 關機段、開機段都正常（log 有 Shutdown／Boot 兩筆）；一般連線解析正常。**問題**：Autostart 開機後第一次連線 12 個網域全失敗、之後切 Wi-Fi 背景程序完全沒反應。
 - 2026-11-04 v1.12：net_up() 在 cmState 讀不到時改看 wlan0 IP＋DNS；每次等事件最多 300 秒；重試不提前放棄；log 記下狀態、每輪失敗與 nslookup 錯誤、背景程序啟動／被結束；Diagnose 加「background process」段。待使用者照測試流程（重開機→關飛航等 1 分→切 Wi-Fi 等 1 分→Diagnose）回傳 firewall.log＋diagnose.txt。
+- 2026-11-04 實測 v1.12：背景程序正常、每次斷線／連上都有反應；但開機後第一次連線 `dns=` 空（resolv.conf 無 nameserver）一分鐘以上→全部解析失敗，休眠喚醒續約後才恢復。推測 DHCP 廣播（255.255.255.255:67）被 DROP。
+- 2026-11-04 v1.13：放行 DHCP 廣播；refresh_allow 先等 DNS 伺服器出現（最多 300 秒）再解析。待使用者重開機測：開機後第一次連線 dns= 是否立刻有值、是否一次放行 12 個網域。
