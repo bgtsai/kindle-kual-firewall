@@ -141,7 +141,7 @@ Firewall ▸
 | --- | --- | --- |
 | `firewall.log` | `extensions/firewall/firewall.log` | 每個動作一行：規則已套用、網站已放行、開機設定已安裝、錯誤訊息。 |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | **Diagnose** 的輸出。 |
-| `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | 只有在 Wi-Fi 已連上、但 Kindle 60 秒內都沒有 DNS 伺服器設定時，才會自動產生；這時插件會改成直接向路由器查詢放行網站。回報問題時請附上這個檔。 |
+| `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | 只有在 Wi-Fi 已連上 60 秒、Kindle 仍沒有 DNS 伺服器時才會自動產生（見已知限制）。回報問題時請附上這個檔。 |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | 按 **Diagnose** 後 2 分鐘內錄到的 Wi-Fi 事件。 |
 | `firewall.conf` | `/etc/upstart/firewall.conf`（系統分區，USB 看不到） | 開機設定，按過 **Install Autostart** 才會有。 |
 | `firewall_airplane_shutdown.conf`、`firewall_airplane_boot.conf` | `/etc/upstart/`（系統分區） | 按過 **Install Airplane-on-Boot** 才會有。關機那個只在真的關機／重開機時執行，而且最多 10 秒，不會卡住關機。 |
@@ -170,6 +170,7 @@ Wi-Fi 關著時插件只是在等（保險起見至少每 5 分鐘醒來檢查�
 ## 已知限制
 
 - **沒裝開機自動執行的話，重開機後規則會消失。** 再按一次 Enable，或使用 Install Autostart。
+- **開機後第一次連 Wi-Fi，Kindle 可能要 1～5 分鐘才真正能上網。** Kindle 會立刻拿到 IP，但要過一陣子才啟用對外的路由和 DNS 伺服器（5.13.5 實測；這段時間防火牆沒有擋任何封包，Amazon 自己的服務也連不上）。這段時間 KOReader 也連不上。插件會等到 DNS 能用就立刻放行，`firewall.log` 會寫 `DNS server appeared after …s`。
 - **IP 會變**，尤其是架在 Cloudflare／CDN 後面的網站。每次 Wi-Fi 重新連上都會重查；如果一直連著很久之後下載失敗，把 Wi-Fi 關掉再打開（或再按一次 Enable）。
 - **只處理 IPv4。** 實測的 Kindle 沒有 IPv6（沒有 `ip6tables`），所以沒有處理 IPv6。
 - **防火牆開著時 Wi-Fi 出錯** → `WIFI_NO_NET_PROBE` 不存在、檔名不對，或放進去之後沒有重開機。見[安裝後一定要重開機](#安裝後一定要重開機)。

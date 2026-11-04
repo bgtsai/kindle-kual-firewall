@@ -141,7 +141,7 @@ Things to know:
 | --- | --- | --- |
 | `firewall.log` | `extensions/firewall/firewall.log` | One line per action: rules applied, sites allowed, autostart installed, errors. |
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
-| `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | Written automatically only when Wi-Fi is connected but the Kindle has no DNS server for 60 s. The extension then looks up the allowed sites through your router directly. Send this file when reporting problems. |
+| `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | Written automatically only when Wi-Fi has been connected for 60 s but the Kindle still has no DNS server (see Known limitations). Send this file when reporting problems. |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | Wi-Fi events recorded for 2 minutes after **Diagnose**. |
 | `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
 | `firewall_airplane_shutdown.conf`, `firewall_airplane_boot.conf` | `/etc/upstart/` (system partition) | Only after **Install Airplane-on-Boot**. The shutdown one runs only during a real shutdown/reboot and is limited to 10 s, so it can't hang shutdown. |
@@ -170,6 +170,7 @@ While Wi-Fi is off the extension just waits (it checks again at least every 5 mi
 ## Known limitations
 
 - **Without Autostart, rules are lost on reboot.** Press Enable again, or use Install Autostart.
+- **Right after boot, the first Wi-Fi connection may take 1–5 minutes before the Kindle can really reach the internet.** The Kindle gets an IP address at once but only switches on its internet route and DNS server later (tested on 5.13.5; the firewall drops nothing during that time — Amazon's own services can't connect either). KOReader can't connect during that time. The extension waits and allows the sites as soon as DNS works; `firewall.log` shows `DNS server appeared after …s`.
 - **IP addresses can change**, especially for sites behind Cloudflare/CDNs. They are looked up again each time Wi-Fi reconnects; if downloads fail while staying connected for a long time, turn Wi-Fi off and on (or press Enable again).
 - **IPv4 only.** The tested Kindle has no IPv6 (`ip6tables` not present), so IPv6 is not handled.
 - **Wi-Fi error while the firewall is on** → `WIFI_NO_NET_PROBE` is missing, misnamed, or the Kindle wasn't rebooted after adding it. See [A reboot is required](#a-reboot-is-required-after-installing).

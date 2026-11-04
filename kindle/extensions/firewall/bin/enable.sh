@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall enable.sh v1.14
+# firewall enable.sh v1.15
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
@@ -30,7 +30,7 @@ log "Basic rules applied (WAN blocked)" "基本規則已套用（WAN 已阻斷�
 dns_debug_snapshot() {
     gw="$(default_gateway)"
     {
-        echo "firewall dns_debug v1.14  $(date)"
+        echo "firewall dns_debug v1.15  $(date)"
         echo "$(net_desc) gateway=$gw"
         echo; echo "===== resolv.conf (link target + content) ====="
         ls -la /etc/resolv.conf 2>&1
@@ -65,20 +65,28 @@ dns_debug_snapshot() {
 # 而且沒有完整重試就停了；固定試完，最多多花一分鐘。
 refresh_allow() {
     log "Wi-Fi up, resolving ($(net_desc))" "Wi-Fi 已連上，開始查詢放行網域（狀態見上一行）"
-    # 還沒有 DNS 伺服器時先等；等不到就留證據，改向預設閘道查詢
-    srv=""
+    # Wi-Fi 連著但系統還沒啟用 DNS 時，一直等到 DNS 出現（不設上限）；斷線就停。
+    # 為什麼不設上限：5.13.5 實測開機後第一次連線，Kindle 要 1.5～5 分鐘以上才建立預設路由與
+    # /var/run/resolv.conf（DHCP 早就把 DNS 寫在 /tmp/resolv.conf），這段期間整台都不能上網。
+    # DNS 出現時不會有新的 Wi-Fi 事件，所以等不到就放棄的話，要到下次重連才會補上（v1.13 的失敗）。
+    # 「改問路由器」行不通：那時連預設路由都沒有（v1.14 實測）。
     if [ -z "$(dns_server)" ]; then
         waited=0
-        while [ -z "$(dns_server)" ] && [ "$waited" -lt "$DNS_WAIT_MAX_S" ]; do
+        noted=0
+        while [ -z "$(dns_server)" ]; do
+            if ! net_up; then
+                log "Wi-Fi dropped while waiting for a DNS server (${waited}s)" "等待 DNS 期間 Wi-Fi 中斷，停止等待"
+                return
+            fi
+            if [ "$noted" -eq 0 ] && [ "$waited" -ge "$DNS_SLOW_NOTE_S" ]; then
+                dns_debug_snapshot
+                log "Still no DNS server after ${waited}s, keep waiting ($(net_desc)). Details: dns_debug.txt" "已等 DNS 一段時間仍未出現，繼續等；細節寫在 dns_debug.txt"
+                noted=1
+            fi
             sleep "$RESOLVE_RETRY_INTERVAL"
             waited=$((waited + RESOLVE_RETRY_INTERVAL))
         done
-        log "Waited ${waited}s for a DNS server ($(net_desc))" "等待 DNS 伺服器設定（等待秒數與結果見上一行）"
-        if [ -z "$(dns_server)" ]; then
-            dns_debug_snapshot
-            srv="$(default_gateway)"
-            log "No DNS server configured; querying gateway '$srv' directly. Details: dns_debug.txt" "系統沒有 DNS 伺服器設定，改向路由器直接查詢；細節寫在 dns_debug.txt"
-        fi
+        log "DNS server appeared after ${waited}s ($(net_desc))" "DNS 伺服器已出現（等待秒數見上一行）"
     fi
     iptables -F "$ALLOW_CHAIN"
     added=" "
@@ -89,7 +97,7 @@ refresh_allow() {
         try=$((try + 1))
         still=""
         for d in $pending; do
-            ips="$(resolve_ipv4 "$d" $srv)"
+            ips="$(resolve_ipv4 "$d")"
             if [ -z "$ips" ]; then
                 still="$still $d"
                 continue
@@ -106,7 +114,7 @@ refresh_allow() {
         pending="$(echo $still)"
         if [ -n "$pending" ]; then
             first="${pending%% *}"
-            err="$(nslookup "$first" $srv 2>&1 | tail -n 1)"
+            err="$(nslookup "$first" 2>&1 | tail -n 1)"
             log "Round $try/$RESOLVE_RETRY_MAX: $(echo $pending | wc -w) not resolved ($(net_desc)); nslookup $first: $err" "第 $try 輪：仍有網域查不到（細節見上一行）"
             [ "$try" -lt "$RESOLVE_RETRY_MAX" ] && sleep "$RESOLVE_RETRY_INTERVAL"
         fi

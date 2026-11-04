@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.14 — 各腳本共用的路徑與函式
+# firewall common.sh v1.15 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -51,11 +51,8 @@ CALIBRE_BROADCAST_PORTS="54982 48123 39001 44044 59678"
 # Wi-Fi 連上後，還有網域解析失敗時的重試間隔 (s) 與次數；用完就停，等下一次連線
 RESOLVE_RETRY_INTERVAL=10
 RESOLVE_RETRY_MAX=6
-# 連上後還沒有 DNS 伺服器（resolv.conf 沒有 nameserver）時，最多等多久 (s)；
-# 等不到就寫 dns_debug.txt 留證據，並改成直接向預設閘道（路由器）查詢。
-# 為什麼：5.13.5 實測 Autostart 開機後第一次連線，resolv.conf 一直沒有 nameserver（等 5 分鐘也沒有），
-# 休眠喚醒或重連 Wi-Fi 後才出現；原因未明（v1.13 推測 DHCP 廣播被擋，實測否定：DHCP 用原始封包，不經 iptables）。
-DNS_WAIT_MAX_S=60
+# 連上後還沒有 DNS 伺服器時會一直等（見 enable.sh refresh_allow）；等超過這麼久 (s) 寫一次 log 與 dns_debug.txt
+DNS_SLOW_NOTE_S=60
 DNS_DEBUG="$BASE/dns_debug.txt"
 # lipc-wait-event 無法使用時（例如開機初期 wifid 還沒起來）改用輪詢的間隔 (s)
 WAIT_FALLBACK_POLL_S=30
@@ -82,7 +79,7 @@ log() {
 # 螢幕提示（eips 不存在就略過）
 notify() { which eips >/dev/null 2>&1 && eips 2 2 "$1                    " >/dev/null 2>&1; }
 
-# 預設閘道（/proc/net/route 裡目的地 00000000 那一列；位址是小端序十六進位）
+# 預設閘道（/proc/net/route 裡目的地 00000000 那一列；位址是小端序十六進位），只用在 dns_debug.txt
 # 十六進位換算用 shell 的 printf，不用 awk：busybox awk 對 "0x.." 字串轉數字的行為不保證
 default_gateway() {
     while read -r iface dest gw rest; do
@@ -92,11 +89,11 @@ default_gateway() {
     done < /proc/net/route 2>/dev/null
 }
 
-# 解析網域的 IPv4。第二個參數可指定 DNS 伺服器（resolv.conf 沒有 nameserver 時用）。
+# 解析網域的 IPv4。
 # 為什麼不用 awk '/^Address: /'：Kindle 的 busybox nslookup 輸出是「Address 1: 1.2.3.4 名稱」，
 # 舊寫法抓不到；第一個 Address 是 DNS 伺服器本身（127.0.0.1），所以只取「Name:」之後的 IPv4。
 resolve_ipv4() {
-    nslookup "$1" $2 2>/dev/null | awk '
+    nslookup "$1" 2>/dev/null | awk '
         /^Name:/ { f = 1; next }
         f && /Address/ {
             for (i = 1; i <= NF; i++)

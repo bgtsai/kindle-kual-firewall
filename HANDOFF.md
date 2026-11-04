@@ -54,3 +54,5 @@
 - 2026-11-04 v1.13：放行 DHCP 廣播；refresh_allow 先等 DNS 伺服器出現（最多 300 秒）再解析。待使用者重開機測：開機後第一次連線 dns= 是否立刻有值、是否一次放行 12 個網域。
 - 2026-11-04 實測 v1.13：DHCP 推測被否定（放行後開機 dns= 仍空 5 分鐘；DHCP 用原始封包本來就不經 iptables）。
 - 2026-11-04 v1.14：拿掉 DHCP 規則；等 DNS 60 秒仍無 → 寫 dns_debug.txt（resolv.conf 連結／內容、/etc/resolv.d、DHCP 相關程序、路由、向閘道查詢、syslog）並改向預設閘道查詢。另請使用者在該狀態下測 KOReader 能否連 OTA。
+- 2026-11-04 實測 v1.14：dns_debug 顯示開機後第一次連線沒有預設路由、/var/run/resolv.conf 不存在（/tmp/resolv.conf 已有 192.168.1.1），DROP 計數 0、Amazon 服務也解析失敗 → Kindle 自身延遲；約 1.5 分鐘後出現，放行成功；使用者在 KOReader 檢查更新顯示「已是最新版」（連線成功）。改問閘道無效（無預設路由）。
+- 2026-11-04 v1.15：連著且無 DNS 時無上限等待（每 10 秒），60 秒時記 log＋dns_debug；拿掉閘道備援。
