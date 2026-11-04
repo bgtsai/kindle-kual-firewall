@@ -170,7 +170,7 @@ Wi-Fi 關著時插件只是在等（保險起見至少每 5 分鐘醒來檢查�
 ## 已知限制
 
 - **沒裝開機自動執行的話，重開機後規則會消失。** 再按一次 Enable，或使用 Install Autostart。
-- **開機後第一次連 Wi-Fi，Kindle 可能要 1～5 分鐘才真正能上網。** Kindle 會立刻拿到 IP，但要過一陣子才啟用對外的路由和 DNS 伺服器（5.13.5 實測；這段時間防火牆沒有擋任何封包，Amazon 自己的服務也連不上）。這段時間 KOReader 也連不上。插件會等到 DNS 能用就立刻放行，`firewall.log` 會寫 `DNS server appeared after …s`。
+- **開機後第一次連 Wi-Fi，Kindle 可能要 1～5 分鐘才真正能上網。** Kindle 會立刻拿到 IP，但要過一陣子才啟用對外的路由和 DNS 伺服器（5.13.5 實測；這段時間防火牆沒有擋任何封包，Amazon 自己的服務也連不上）。這段時間 KOReader 也連不上。插件會等到 DNS 能用就立刻放行，`firewall.log` 會寫 `DNS server appeared after …s`。有一次實測，開機後先等約 5 分鐘再打開 Wi-Fi，就完全沒有延遲（DNS 立刻就有），看起來原因是 Kindle 開機初期還在忙——只測過一次。
 - **IP 會變**，尤其是架在 Cloudflare／CDN 後面的網站。每次 Wi-Fi 重新連上都會重查；如果一直連著很久之後下載失敗，把 Wi-Fi 關掉再打開（或再按一次 Enable）。
 - **只處理 IPv4。** 實測的 Kindle 沒有 IPv6（沒有 `ip6tables`），所以沒有處理 IPv6。
 - **防火牆開著時 Wi-Fi 出錯** → `WIFI_NO_NET_PROBE` 不存在、檔名不對，或放進去之後沒有重開機。見[安裝後一定要重開機](#安裝後一定要重開機)。
