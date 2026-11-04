@@ -28,6 +28,8 @@ It can also start automatically on boot, so the firewall is active before Wi-Fi 
 5. Eject the Kindle and **reboot it** (see below why this is required).
 6. Open KUAL. You should see a **Firewall** entry.
 
+**Updating to a new version:** copy the new zip's contents over the old ones the same way, then press Firewall ▸ **Enable Firewall** again — the running rules are the old version's until you do (with Autostart, a reboot also applies them). If the new version changed a boot job, see [Step 3](#step-3--install-the-result).
+
 ### A reboot is required after installing
 
 Most KUAL extensions work right away without a reboot. This one is different because of `WIFI_NO_NET_PROBE`:
