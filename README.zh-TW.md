@@ -123,8 +123,8 @@ Firewall ▸
 | `objects.githubusercontent.com` | 443 | GitHub 較舊的下載網域，以防還有檔案使用它 | 實測沒看到，預防性保留 |
 | `api.github.com` | 443 | 舊版留下的（GitHub API） | — |
 | `cyphar.github.io` | 443 | 日文字典（JMdict、JMnedict） | dictionaries.lua；不轉址 |
-| UDP 廣播 `255.255.255.255`（不是網站） | 54982、48123、39001、44044、59678 | 在區域網路上找 calibre，用來無線傳書（給規劃中的配套插件 `kindle-kual-calibre-wireless`）。廣播不會離開你家的區域網路。 | UNCaGED 函式庫把目標寫死成 `255.255.255.255`（`calibre/calibre.go`）；埠號是 calibre 的 `BROADCAST_PORTS`（`src/calibre/devices/smart_device_app/driver.py`）。calibre 的回覆是**送進來**的方向（INPUT），這個防火牆不管；連到 calibre 的 TCP 目標是 `192.168.x.x`，本來就放行。 |
 | `build.koreader.rocks` | 80 | 少數幾本字典（CIA Factbook、GCIDE、Pape） | dictionaries.lua；不轉址 |
+| UDP 廣播 `255.255.255.255`（不是網站） | 54982、48123、39001、44044、59678 | 在區域網路上找 calibre，用來無線傳書（給配套插件 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless)）。廣播不會離開你家的區域網路。 | UNCaGED 函式庫把目標寫死成 `255.255.255.255`（`calibre/calibre.go`）；埠號是 calibre 的 `BROADCAST_PORTS`（`src/calibre/devices/smart_device_app/driver.py`）。calibre 的回覆是**送進來**的方向（INPUT），這個防火牆不管；連到 calibre 的 TCP 目標是 `192.168.x.x`，本來就放行。 |
 
 上面每個主機都同時放行 80 和 443 埠（KOReader OTA 用 `http://`，大部分字典用 `https://`）。
 
@@ -172,6 +172,7 @@ Wi-Fi 關著時插件只是在等（保險起見至少每 5 分鐘醒來檢查�
 - **沒裝開機自動執行的話，重開機後規則會消失。** 再按一次 Enable，或使用 Install Autostart。
 - **開機後第一次連 Wi-Fi，Kindle 可能要 1～5 分鐘才真正能上網。** Kindle 會立刻拿到 IP，但要過一陣子才啟用對外的路由和 DNS 伺服器（5.13.5 實測；這段時間防火牆沒有擋任何封包，Amazon 自己的服務也連不上）。這段時間 KOReader 也連不上。插件會等到 DNS 能用就立刻放行，`firewall.log` 會寫 `DNS server appeared after …s`。有一次實測，開機後先等約 5 分鐘再打開 Wi-Fi，就完全沒有延遲（DNS 立刻就有），看起來原因是 Kindle 開機初期還在忙——只測過一次。
 - **IP 會變**，尤其是架在 Cloudflare／CDN 後面的網站。每次 Wi-Fi 重新連上都會重查；如果一直連著很久之後下載失敗，把 Wi-Fi 關掉再打開（或再按一次 Enable）。
+- **只擋網路更新。** 用 USB 複製進來的韌體更新檔，仍然可以從 設定 ▸ 更新您的 Kindle 安裝。韌體 5.11 以上，有些工具用的 `update.bin.tmp.partial` 資料夾法已經擋不住更新（[KindleModding – Disabling OTA Updates](https://kindlemodding.org/jailbreaking/Legacy/post-jailbreak/disable-ota.html)）；要多一層保護，用 KUAL 的 *Rename OTA Binaries*（renameotabin），它跟這個防火牆互相獨立。
 - **只處理 IPv4。** 實測的 Kindle 沒有 IPv6（沒有 `ip6tables`），所以沒有處理 IPv6。
 - **防火牆開著時 Wi-Fi 出錯** → `WIFI_NO_NET_PROBE` 不存在、檔名不對，或放進去之後沒有重開機。見[安裝後一定要重開機](#安裝後一定要重開機)。
 - **韌體更新會清掉開機設定（Autostart 與 Airplane-on-Boot）**，因為更新會覆蓋系統分區（不過這個防火牆本來就是要擋更新）。
