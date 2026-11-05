@@ -1,5 +1,6 @@
 #!/bin/sh
-# firewall autostart_remove.sh v1.8
+# firewall autostart_remove.sh v1.17
+# 長期關掉防火牆用：配合 Disable。之後再按 Enable 會重新安裝開機自動執行。
 . "$(dirname "$0")/common.sh"
 
 mntroot rw || { log "ERROR: mntroot rw failed" "錯誤：mntroot rw 失敗"; notify "Remove FAILED"; exit 1; }
@@ -11,5 +12,5 @@ if [ -f "$UPSTART_CONF" ]; then
     notify "Remove FAILED"
 else
     log "Autostart removed" "開機自動執行已移除"
-    notify "Autostart removed"
+    notify "Autostart removed (Enable turns it back on)"
 fi

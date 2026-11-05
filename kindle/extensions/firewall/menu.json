@@ -5,38 +5,33 @@
       "priority": 1,
       "items": [
         {
-          "name": "Enable Firewall (Block WAN)",
+          "name": "Enable Firewall (Block WAN, also at boot)",
           "priority": 1,
           "action": "./bin/enable.sh"
         },
         {
-          "name": "Disable Firewall (Allow WAN)",
+          "name": "Disable Firewall (until next boot)",
           "priority": 2,
           "action": "./bin/disable.sh"
         },
         {
-          "name": "Install Autostart (enable on boot)",
+          "name": "Remove Autostart (stay off after reboot)",
           "priority": 3,
-          "action": "./bin/autostart_install.sh"
-        },
-        {
-          "name": "Remove Autostart",
-          "priority": 4,
           "action": "./bin/autostart_remove.sh"
         },
         {
           "name": "Install Airplane-on-Boot (Wi-Fi off at every boot)",
-          "priority": 5,
+          "priority": 4,
           "action": "./bin/airplane_install.sh"
         },
         {
           "name": "Remove Airplane-on-Boot",
-          "priority": 6,
+          "priority": 5,
           "action": "./bin/airplane_remove.sh"
         },
         {
           "name": "Diagnose (write diagnose.txt)",
-          "priority": 7,
+          "priority": 6,
           "action": "./bin/diagnose.sh"
         }
       ]

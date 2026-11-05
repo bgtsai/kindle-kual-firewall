@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall enable.sh v1.16
+# firewall enable.sh v1.17
 . "$(dirname "$0")/common.sh"
 
 stop_resolver
@@ -170,4 +170,8 @@ refresh_allow() {
 ) </dev/null >/dev/null 2>&1 &
 echo $! > "$PIDFILE"
 
-notify "Firewall ON"
+if ensure_autostart; then
+    notify "Firewall ON (also at every boot)"
+else
+    notify "Firewall ON - autostart FAILED, see firewall.log"
+fi

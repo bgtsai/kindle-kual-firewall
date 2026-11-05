@@ -11,7 +11,7 @@
 
 完整清單與每一項的理由見[到底放行了哪些](#到底放行了哪些)。
 
-也可以設定成開機自動啟用，讓防火牆比 Wi-Fi 與 OTA 服務更早生效。
+開啟後**重開機也會維持開啟**：按 Enable 時會同時安裝開機設定，讓防火牆比 Wi-Fi 與 OTA 服務更早生效，就算你忘了再開一次也一樣有保護。
 
 > **實測機型：** Kindle 韌體 5.13.5（核心 4.1.15），包含防火牆開著時連 Wi-Fi。其他機型可能要調整，見[請 AI 幫你改成適合你的 Kindle](#請-ai-幫你改成適合你的-kindle)。
 
@@ -31,7 +31,7 @@
 5. 退出 Kindle，**重新開機**（原因見下方）。
 6. 打開 KUAL，應該會看到 **Firewall** 這一項。
 
-**更新到新版：** 把新 zip 的內容照同樣方式蓋過去，然後再按一次 Firewall ▸ **Enable Firewall**——沒按之前，生效的還是舊版的規則（有裝 Autostart 的話重開機也會套用）。新版若改了開機設定，見[第 3 步](#第-3-步裝上改好的版本)。
+**更新到新版：** 把新 zip 的內容照同樣方式蓋過去，然後再按一次 Firewall ▸ **Enable Firewall**——沒按之前，生效的還是舊版的規則（重開機也會套用）。新版若改了開機設定，按 Enable 時會一併更新。
 
 ### 安裝後一定要重開機
 
@@ -58,7 +58,6 @@ Kindle 磁碟（根目錄）
             ├── common.sh
             ├── enable.sh
             ├── disable.sh
-            ├── autostart_install.sh
             ├── autostart_remove.sh
             ├── airplane_install.sh
             ├── airplane_remove.sh
@@ -82,10 +81,9 @@ Kindle 磁碟（根目錄）
 
 ```
 Firewall ▸
-    Enable Firewall (Block WAN)
-    Disable Firewall (Allow WAN)
-    Install Autostart (enable on boot)
-    Remove Autostart
+    Enable Firewall (Block WAN, also at boot)
+    Disable Firewall (until next boot)
+    Remove Autostart (stay off after reboot)
     Install Airplane-on-Boot (Wi-Fi off at every boot)
     Remove Airplane-on-Boot
     Diagnose (write diagnose.txt)
@@ -93,10 +91,9 @@ Firewall ▸
 
 | 選項 | 做什麼 |
 | --- | --- |
-| **Enable Firewall** | 立刻擋掉外網。接著在背景等 Wi-Fi 連上，再查詢放行網站的 IP 並放行。之後每次 Wi-Fi 重新連上都會重查一次（IP 變了也跟得上），飛行模式時完全不動。所以 Wi-Fi 沒開時按也沒關係。 |
-| **Disable Firewall** | 移除所有阻擋規則，恢復全部放行。 |
-| **Install Autostart** | 安裝開機設定（`/etc/upstart/firewall.conf`），每次開機都自動啟用防火牆，而且比 Wi-Fi 與 OTA 服務更早。這會寫入 Kindle 的系統分區。 |
-| **Remove Autostart** | 刪除那個開機設定。 |
+| **Enable Firewall** | 立刻擋掉外網。接著在背景等 Wi-Fi 連上，再查詢放行網站的 IP 並放行。之後每次 Wi-Fi 重新連上都會重查一次（IP 變了也跟得上），飛行模式時完全不動。所以 Wi-Fi 沒開時按也沒關係。**同時安裝開機設定**（`/etc/upstart/firewall.conf`，在 Kindle 的系統分區），每次開機都會自動恢復防火牆，而且比 Wi-Fi 與 OTA 服務更早——只在第一次、或新版改了開機設定時才寫入。畫面顯示 `Firewall ON (also at every boot)`；系統分區寫不進去時顯示 `autostart FAILED`（細節在 `firewall.log`）。 |
+| **Disable Firewall** | 移除所有阻擋規則，恢復全部放行——**只到下次開機為止**。開機設定還在，重開機後防火牆會再開啟。要一直關著，再按 **Remove Autostart**。 |
+| **Remove Autostart** | 刪除開機設定，重開機後防火牆不會再開（配合 Disable，就是長期關掉）。之後再按 Enable 會重新安裝。 |
 | **Install Airplane-on-Boot** | 可選的第二層保護。每次關機時進入飛行模式（關 Wi-Fi），開機後再設一次當保險（例如沒電直接關機時）。Kindle 會記住飛行模式，所以開機時 Wi-Fi 就是關的，不會自己連上。**副作用：每次開機 Wi-Fi 都是關的，要用時自己打開。** 會在系統分區寫兩個小的開機設定。跟 Autostart 互相獨立：防火牆本來就比 Wi-Fi 早生效，這是額外保護，不是必要的。 |
 | **Remove Airplane-on-Boot** | 刪除那兩個開機設定，開機時 Wi-Fi 恢復正常行為。 |
 | **Diagnose** | 把系統資訊寫進 `diagnose.txt`（只讀取、不改任何東西）。接著在背景錄 2 分鐘的 Wi-Fi 事件到 `diagnose_wifi_events.txt`，這段時間內請把 Wi-Fi 關掉再打開。用來排查問題，或把插件改成適合其他機型。 |
@@ -148,7 +145,7 @@ Firewall ▸
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | **Diagnose** 的輸出。 |
 | `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | 只有在 Wi-Fi 已連上 60 秒、Kindle 仍沒有 DNS 伺服器時才會自動產生（見已知限制）。回報問題時請附上這個檔。 |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | 按 **Diagnose** 後 2 分鐘內錄到的 Wi-Fi 事件。 |
-| `firewall.conf` | `/etc/upstart/firewall.conf`（系統分區，USB 看不到） | 開機設定，按過 **Install Autostart** 才會有。 |
+| `firewall.conf` | `/etc/upstart/firewall.conf`（系統分區，USB 看不到） | 開機設定，由 **Enable Firewall** 安裝、**Remove Autostart** 刪除。 |
 | `firewall_airplane_shutdown.conf`、`firewall_airplane_boot.conf` | `/etc/upstart/`（系統分區） | 按過 **Install Airplane-on-Boot** 才會有。關機那個只在真的關機／重開機時執行，而且最多 10 秒，不會卡住關機。 |
 
 磁碟根目錄的 `WIFI_NO_NET_PROBE` 不是插件產生的，是 zip 裡附的（見[安裝](#安裝)）。
@@ -174,21 +171,20 @@ Wi-Fi 關著時插件只是在等（保險起見至少每 5 分鐘醒來檢查�
 
 ## 已知限制
 
-- **沒裝開機自動執行的話，重開機後規則會消失。** 再按一次 Enable，或使用 Install Autostart。
+- **Disable 只是暫時的**：重開機後防火牆會再開啟。要一直關著，再按 **Remove Autostart**。
 - **開機後第一次連 Wi-Fi，Kindle 可能要 1～5 分鐘才真正能上網。** Kindle 會立刻拿到 IP，但要過一陣子才啟用對外的路由和 DNS 伺服器（5.13.5 實測；這段時間防火牆沒有擋任何封包，Amazon 自己的服務也連不上）。這段時間 KOReader 也連不上。插件會等到 DNS 能用就立刻放行，`firewall.log` 會寫 `DNS server appeared after …s`。有一次實測，開機後先等約 5 分鐘再打開 Wi-Fi，就完全沒有延遲（DNS 立刻就有），看起來原因是 Kindle 開機初期還在忙——只測過一次。
 - **IP 會變**，尤其是架在 Cloudflare／CDN 後面的網站。每次 Wi-Fi 重新連上都會重查；如果一直連著很久之後下載失敗，把 Wi-Fi 關掉再打開（或再按一次 Enable）。
 - **只擋網路更新。** 用 USB 複製進來的韌體更新檔，仍然可以從 設定 ▸ 更新您的 Kindle 安裝。韌體 5.11 以上，有些工具用的 `update.bin.tmp.partial` 資料夾法已經擋不住更新（[KindleModding – Disabling OTA Updates](https://kindlemodding.org/jailbreaking/Legacy/post-jailbreak/disable-ota.html)）；要多一層保護，用 KUAL 的 *Rename OTA Binaries*（renameotabin），它跟這個防火牆互相獨立。
 - **只處理 IPv4。** 實測的 Kindle 沒有 IPv6（沒有 `ip6tables`），所以沒有處理 IPv6。
 - **防火牆開著時 Wi-Fi 出錯** → `WIFI_NO_NET_PROBE` 不存在、檔名不對，或放進去之後沒有重開機。見[安裝後一定要重開機](#安裝後一定要重開機)。
-- **韌體更新會清掉開機設定（Autostart 與 Airplane-on-Boot）**，因為更新會覆蓋系統分區（不過這個防火牆本來就是要擋更新）。
+- **韌體更新會清掉開機設定（Autostart 與 Airplane-on-Boot）**，因為更新會覆蓋系統分區（不過這個防火牆本來就是要擋更新）。之後再按一次 Enable。
 - 萬一開機設定出問題導致 Kindle 無法正常開機，用 SSH 刪除 `/etc/upstart/firewall.conf`（以及 `firewall_airplane_*.conf`）。開機設定本身寫成「找不到插件資料夾就什麼都不做」。
 
 ## 移除
 
-1. Firewall ▸ **Remove Autostart** 與 **Remove Airplane-on-Boot**（如果有裝）。
-2. Firewall ▸ **Disable Firewall**。
-3. 用 USB 刪除 `extensions/firewall`。
-4. 刪除磁碟根目錄的 `WIFI_NO_NET_PROBE` 並重開機，讓 Kindle 恢復正常的連線檢查。（可省略，留著也沒有壞處。）
+1. Firewall ▸ **Disable Firewall**，再按 **Remove Autostart**；有裝 Airplane-on-Boot 的話也按 **Remove Airplane-on-Boot**。
+2. 用 USB 刪除 `extensions/firewall`。
+3. 刪除磁碟根目錄的 `WIFI_NO_NET_PROBE` 並重開機，讓 Kindle 恢復正常的連線檢查。（可省略，留著也沒有壞處。）
 
 ## 請 AI 幫你改成適合你的 Kindle
 
@@ -230,7 +226,7 @@ Wi-Fi 關著時插件只是在等（保險起見至少每 5 分鐘醒來檢查�
 
 ### 第 3 步：裝上改好的版本
 
-用新的資料夾取代 Kindle 上的 `extensions/firewall`（根目錄的 `WIFI_NO_NET_PROBE` 保留），如果改到跟 Wi-Fi 有關的部分就重開機，再照[確認有沒有生效](#確認有沒有生效)測一次。如果之前裝過開機自動執行，而 AI 改動了開機設定，要先用**舊版**按 **Remove Autostart**，換上新版後再按 **Install Autostart**。
+用新的資料夾取代 Kindle 上的 `extensions/firewall`（根目錄的 `WIFI_NO_NET_PROBE` 保留），如果改到跟 Wi-Fi 有關的部分就重開機，再照[確認有沒有生效](#確認有沒有生效)測一次。再按一次 **Enable Firewall**：AI 若改了開機設定，它會一併更新。
 
 ## 給 AI 的說明
 

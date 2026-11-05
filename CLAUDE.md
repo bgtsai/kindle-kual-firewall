@@ -17,7 +17,6 @@ kindle/
             ├── common.sh         shared paths, ALLOW_DOMAINS, resolve_ipv4(), log(), notify()
             ├── enable.sh         base rules now; background process waits for Wi-Fi (cmStateChange → CONNECTED) and rebuilds the FW_ALLOW chain
             ├── disable.sh        stop background process + its lipc-wait-event, flush OUTPUT, delete FW_ALLOW, policy ACCEPT
-            ├── autostart_install.sh   mntroot rw → write /etc/upstart/firewall.conf → mntroot ro
             ├── autostart_remove.sh    mntroot rw → delete it → mntroot ro
             ├── airplane_install.sh    writes /etc/upstart/firewall_airplane_{shutdown,boot}.conf
             ├── airplane_remove.sh     deletes them
@@ -32,7 +31,7 @@ Always deliver the result as `firewall.zip` whose top level is `extensions/` + `
 
 | Part | Where | What to check in diagnose.txt |
 | --- | --- | --- |
-| Boot hook `start on starting lab126` | `autostart_install.sh` | `upstart start/stop triggers`: `wifid`, `otaupd`, `otav3` must start on `started lab126` (or later). If OTA or Wi-Fi starts earlier, pick an earlier event. If `/etc/upstart/` doesn't exist (firmware < 5.x), upstart autostart does not apply at all. |
+| Boot hook `start on starting lab126` | `common.sh` `autostart_conf()` | `upstart start/stop triggers`: `wifid`, `otaupd`, `otav3` must start on `started lab126` (or later). If OTA or Wi-Fi starts earlier, pick an earlier event. If `/etc/upstart/` doesn't exist (firmware < 5.x), upstart autostart does not apply at all. |
 | `nslookup` output parsing | `common.sh` `resolve_ipv4()` | `nslookup github.com` section. Parser takes IPv4 tokens on `Address` lines **after** the `Name:` line (the first Address is the DNS server, `127.0.0.1` on the tested device). |
 | conntrack vs state | `enable.sh` | `conntrack / state modules`. Code already falls back from conntrack to state. |
 | IPv6 | not implemented | `tools`: if `ip6tables` exists and `IPv6 addresses` is non-empty, add equivalent ip6tables rules (tested device had neither). |
@@ -50,6 +49,7 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 - **Base rules first, allow-list later.** With Wi-Fi off, DNS fails; the old version then added no allow rule and never recovered. Allow rules live in chain `FW_ALLOW` (OUTPUT jumps to it before DROP); each Wi-Fi connect flushes and rebuilds it, one rule pair per unique IP.
 - **Event-driven, not polling.** The background process blocks in `lipc-wait-event -s 0 com.lab126.wifid cmStateChange` and resolves only on a transition to `CONNECTED` (read via `lipc-get-prop com.lab126.wifid cmState`). Don't trigger on `cmConnected`: it repeats every ~30 s while connected (5.13.5). If lipc-wait-event fails fast (wifid not up yet at boot), fall back to polling every `WAIT_FALLBACK_POLL_S`. Each wait is wrapped in `timeout -t WAIT_MAX_S` (300 s) so a stuck waiter can't hide a connection forever. `net_up()`: cmState=CONNECTED → up; cmState empty (lipc unreadable) → up if wlan0 has an IPv4 and resolv.conf has a nameserver; v1.11 on 5.13.5 never noticed Wi-Fi after an autostart boot (suspected empty cmState). Retries after connect run to completion (no early abort); each failed round logs `net_desc` and one raw nslookup error.
 - **Allow-list = what KOReader actually contacts** (OTA servers from `otamanager.lua`, dictionary hosts from `dictionaries.lua`), ports 80 and 443. Before adding a host, check it in KOReader's source and test for redirects (`curl -sI`); github.com release downloads redirect to `release-assets.githubusercontent.com`. Keep README's "KOReader sites" table in sync. README structure: "What exactly is allowed" is the one complete list, every row with its reason/source; "KOReader sites" only expands that table's KOReader row (one host per row). Non-site rules (NTP, broadcast, DNS…) go only in the first table.
+- **Enable also installs the boot job (v1.17, user's decision).** Forgetting Install Autostart left the Kindle unprotected after a reboot; "always blocking" is safer. `ensure_autostart` (common.sh) writes `/etc/upstart/firewall.conf` only if missing or different from `autostart_conf()` (so normal Enables never touch mntroot, and a new version's job is updated by the next Enable), and never when called by upstart at boot (`UPSTART_JOB` set). Disable is temporary (job stays → on again after reboot); Remove Autostart turns it off for good until the next Enable. The old Install Autostart menu item/script was removed.
 - **Boot job must never block boot.** It only calls `enable.sh` if the file exists, and `enable.sh` backgrounds the slow part. Keep it a `task` on `starting lab126` so it finishes before Wi-Fi/OTA start.
 - **Airplane-on-Boot** (optional, separate menu items, user's choice): shutdown job `start on stopping wifid`, runs only if `/tmp/shutdown_in_progress` exists (shutdown.conf writes it before stopping services), wrapped in busybox `timeout -t 10`; boot job `start on started cmd`, waits in background up to `AIRPLANE_BOOT_WAIT_S` for com.lab126.cmd. Airplane mode persists across reboot (user-tested on 5.13.5).
 - **Background process is single-instance** via `/var/run/firewall_resolver.pid` (+ `firewall_waiter.pid` for its current lipc-wait-event); Enable and Disable kill both.
@@ -64,4 +64,4 @@ Tested device: firmware 5.13.5, kernel 4.1.15-lab126, busybox nslookup, `iptable
 4. If you changed `enable.sh` logic, test it with stub `iptables`/`nslookup` scripts on PATH (simulate DNS failing a few times, then succeeding).
 5. Grep for leftover old names/paths if you renamed anything (folder name, `/etc/upstart/firewall.conf`, `firewall.log`).
 6. Tell the user what was verified by you vs. what only the real device can confirm.
-7. If a boot job changed, tell the user to run **Remove Autostart** / **Remove Airplane-on-Boot** with the old version before installing the new one.
+7. If the firewall boot job changed, pressing Enable updates it. If an Airplane-on-Boot job changed, tell the user to run **Remove Airplane-on-Boot** with the old version before installing the new one.

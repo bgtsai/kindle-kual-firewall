@@ -1,5 +1,5 @@
 #!/bin/sh
-# firewall common.sh v1.15 — 各腳本共用的路徑與函式
+# firewall common.sh v1.17 — 各腳本共用的路徑與函式
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$BASE/firewall.log"
@@ -147,4 +147,39 @@ stop_resolver() {
             rm -f "$f"
         fi
     done
+}
+
+# ---- 開機自動執行（v1.17 起由 Enable 自動安裝）----
+# 為什麼合併進 Enable：使用者忘了按 Install Autostart，重開機後就完全沒有防護；
+# 「總是擋著」比較安全，要放行時有 Disable（暫時，下次開機恢復）與 Remove Autostart（長期）。
+# 為什麼掛在 starting lab126：這台的 wifid、otaupd、otav3 都是 start on started lab126，
+# 「starting」時 task 會先跑完 lab126 才繼續，所以防火牆一定早於 Wi-Fi 與 OTA。
+# enable.sh 的放行網域解析在背景跑，不會拖慢開機。腳本不存在時（插件被刪）直接略過，不能讓開機卡住。
+autostart_conf() {
+    cat <<CONF
+# firewall autostart (installed by KUAL extension firewall)
+start on starting lab126
+task
+script
+    S="$BASE/bin/enable.sh"
+    [ -f "\$S" ] && /bin/sh "\$S" || true
+end script
+CONF
+}
+
+# 設定檔不存在或內容跟這一版不同才寫系統分區，平常每次 Enable 都不會動到 mntroot。
+# 開機時（upstart 呼叫，環境有 UPSTART_JOB）不寫：開機中不碰系統分區，下次手動 Enable 再補。
+# 失敗只記 log，不影響規則本身。
+ensure_autostart() {
+    [ -n "$UPSTART_JOB" ] && return 0
+    if [ -f "$UPSTART_CONF" ] && [ "$(cat "$UPSTART_CONF")" = "$(autostart_conf)" ]; then
+        return 0
+    fi
+    write_conf() { autostart_conf > "$UPSTART_CONF"; }
+    if with_rootfs_rw write_conf && [ "$(cat "$UPSTART_CONF" 2>/dev/null)" = "$(autostart_conf)" ]; then
+        log "Autostart installed: $UPSTART_CONF" "開機自動執行已安裝"
+        return 0
+    fi
+    log "ERROR: autostart install failed (firewall is on until reboot)" "錯誤：開機自動執行安裝失敗（防火牆只開到重開機為止）"
+    return 1
 }

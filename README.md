@@ -11,7 +11,7 @@ A KUAL extension for jailbroken Kindles. It blocks all outbound internet traffic
 
 The full list and the reason for each is in [What exactly is allowed](#what-exactly-is-allowed).
 
-It can also start automatically on boot, so the firewall is active before Wi-Fi and the OTA service start.
+Once enabled it **stays on across reboots**: pressing Enable also installs a boot job, so the firewall is active before Wi-Fi and the OTA service start, even if you forget to turn it on again.
 
 > **Tested on:** Kindle firmware 5.13.5 (kernel 4.1.15), including Wi-Fi connecting with the firewall on. Other models may need adjustments — see [Customizing for your Kindle with AI](#customizing-for-your-kindle-with-ai).
 
@@ -31,7 +31,7 @@ It can also start automatically on boot, so the firewall is active before Wi-Fi 
 5. Eject the Kindle and **reboot it** (see below why this is required).
 6. Open KUAL. You should see a **Firewall** entry.
 
-**Updating to a new version:** copy the new zip's contents over the old ones the same way, then press Firewall ▸ **Enable Firewall** again — the running rules are the old version's until you do (with Autostart, a reboot also applies them). If the new version changed a boot job, see [Step 3](#step-3--install-the-result).
+**Updating to a new version:** copy the new zip's contents over the old ones the same way, then press Firewall ▸ **Enable Firewall** again — the running rules are the old version's until you do (a reboot also applies them). Enable also updates the boot job if the new version changed it.
 
 ### A reboot is required after installing
 
@@ -58,7 +58,6 @@ Kindle drive (root)
             ├── common.sh
             ├── enable.sh
             ├── disable.sh
-            ├── autostart_install.sh
             ├── autostart_remove.sh
             ├── airplane_install.sh
             ├── airplane_remove.sh
@@ -82,10 +81,9 @@ Everything is under one entry in KUAL:
 
 ```
 Firewall ▸
-    Enable Firewall (Block WAN)
-    Disable Firewall (Allow WAN)
-    Install Autostart (enable on boot)
-    Remove Autostart
+    Enable Firewall (Block WAN, also at boot)
+    Disable Firewall (until next boot)
+    Remove Autostart (stay off after reboot)
     Install Airplane-on-Boot (Wi-Fi off at every boot)
     Remove Airplane-on-Boot
     Diagnose (write diagnose.txt)
@@ -93,10 +91,9 @@ Firewall ▸
 
 | Item | What it does |
 | --- | --- |
-| **Enable Firewall** | Blocks the internet immediately. Then waits in the background until Wi-Fi connects, looks up the IP addresses of the allowed sites and allows them. It does this again every time Wi-Fi reconnects (so changed IPs are picked up), and stays idle in airplane mode. So it's fine to press this while Wi-Fi is off. |
-| **Disable Firewall** | Removes all blocking rules and allows all traffic again. |
-| **Install Autostart** | Installs a boot job (`/etc/upstart/firewall.conf`) so the firewall turns on at every boot, before Wi-Fi and the OTA service start. This writes to the Kindle's system partition. |
-| **Remove Autostart** | Deletes that boot job. |
+| **Enable Firewall** | Blocks the internet immediately. Then waits in the background until Wi-Fi connects, looks up the IP addresses of the allowed sites and allows them. It does this again every time Wi-Fi reconnects (so changed IPs are picked up), and stays idle in airplane mode. So it's fine to press this while Wi-Fi is off. **It also installs the boot job** (`/etc/upstart/firewall.conf`, on the Kindle's system partition) so the firewall comes back on at every boot, before Wi-Fi and the OTA service start — only the first time, or when a new version changed the boot job. The screen shows `Firewall ON (also at every boot)`, or `autostart FAILED` if the system partition couldn't be written (details in `firewall.log`). |
+| **Disable Firewall** | Removes all blocking rules and allows all traffic again — **until the next boot**. The boot job stays, so the firewall is back on after a reboot. To keep it off, also press **Remove Autostart**. |
+| **Remove Autostart** | Deletes the boot job, so the firewall stays off after a reboot (use it together with Disable to turn the firewall off for good). Pressing Enable later installs it again. |
 | **Install Airplane-on-Boot** | Optional second layer. Turns on airplane mode (Wi-Fi off) during every shutdown, and again right after boot as a safety net (e.g. after the battery died). The Kindle remembers airplane mode across reboots, so it starts with Wi-Fi off and never connects on its own. **Side effect: Wi-Fi is off after every boot — turn it on yourself when you need it.** Writes two small boot jobs to the system partition. Independent of Autostart: the firewall already starts before Wi-Fi, so this is extra protection, not a requirement. |
 | **Remove Airplane-on-Boot** | Deletes those two boot jobs. Wi-Fi then behaves normally at boot again. |
 | **Diagnose** | Writes system information to `diagnose.txt` (read-only, changes nothing). Then, for 2 minutes in the background, records Wi-Fi events to `diagnose_wifi_events.txt` — turn Wi-Fi off and on again during that time. Used for troubleshooting and for customizing the extension for another model. |
@@ -148,7 +145,7 @@ Things to know:
 | `diagnose.txt` | `extensions/firewall/diagnose.txt` | Output of **Diagnose**. |
 | `dns_debug.txt` | `extensions/firewall/dns_debug.txt` | Written automatically only when Wi-Fi has been connected for 60 s but the Kindle still has no DNS server (see Known limitations). Send this file when reporting problems. |
 | `diagnose_wifi_events.txt` | `extensions/firewall/diagnose_wifi_events.txt` | Wi-Fi events recorded for 2 minutes after **Diagnose**. |
-| `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, only after **Install Autostart**. |
+| `firewall.conf` | `/etc/upstart/firewall.conf` (system partition, not visible over USB) | Boot job, installed by **Enable Firewall**, deleted by **Remove Autostart**. |
 | `firewall_airplane_shutdown.conf`, `firewall_airplane_boot.conf` | `/etc/upstart/` (system partition) | Only after **Install Airplane-on-Boot**. The shutdown one runs only during a real shutdown/reboot and is limited to 10 s, so it can't hang shutdown. |
 
 `WIFI_NO_NET_PROBE` at the drive root is not created by the extension — it comes in the zip (see [Installation](#installation)).
@@ -174,21 +171,20 @@ While Wi-Fi is off the extension just waits (it checks again at least every 5 mi
 
 ## Known limitations
 
-- **Without Autostart, rules are lost on reboot.** Press Enable again, or use Install Autostart.
+- **Disable is temporary**: after a reboot the firewall is on again. Use **Remove Autostart** too if you want it off for good.
 - **Right after boot, the first Wi-Fi connection may take 1–5 minutes before the Kindle can really reach the internet.** The Kindle gets an IP address at once but only switches on its internet route and DNS server later (tested on 5.13.5; the firewall drops nothing during that time — Amazon's own services can't connect either). KOReader can't connect during that time. The extension waits and allows the sites as soon as DNS works; `firewall.log` shows `DNS server appeared after …s`. In one test, waiting about 5 minutes after boot before turning Wi-Fi on avoided the delay completely (DNS was there at once), so the cause seems to be the Kindle still starting up — tested once only.
 - **IP addresses can change**, especially for sites behind Cloudflare/CDNs. They are looked up again each time Wi-Fi reconnects; if downloads fail while staying connected for a long time, turn Wi-Fi off and on (or press Enable again).
 - **Only network updates are blocked.** A firmware update copied over USB can still be installed from Settings ▸ Update Your Kindle. On firmware 5.11 and later, the `update.bin.tmp.partial` folder trick used by some other tools no longer blocks updates ([KindleModding – Disabling OTA Updates](https://kindlemodding.org/jailbreaking/Legacy/post-jailbreak/disable-ota.html)); for a second layer there, use KUAL's *Rename OTA Binaries* (renameotabin), which is independent of this firewall.
 - **IPv4 only.** The tested Kindle has no IPv6 (`ip6tables` not present), so IPv6 is not handled.
 - **Wi-Fi error while the firewall is on** → `WIFI_NO_NET_PROBE` is missing, misnamed, or the Kindle wasn't rebooted after adding it. See [A reboot is required](#a-reboot-is-required-after-installing).
-- **Firmware updates remove Autostart and Airplane-on-Boot**, since they overwrite the system partition (but the firewall's purpose is to block those updates).
+- **Firmware updates remove the boot jobs** (Autostart and Airplane-on-Boot), since they overwrite the system partition (but the firewall's purpose is to block those updates). Press Enable again afterwards.
 - If a boot job ever stops the Kindle from booting normally, delete `/etc/upstart/firewall.conf` (and `firewall_airplane_*.conf`) over SSH. The boot job is written to do nothing if the extension folder is missing.
 
 ## Uninstall
 
-1. Firewall ▸ **Remove Autostart** and **Remove Airplane-on-Boot** (if you installed them).
-2. Firewall ▸ **Disable Firewall**.
-3. Delete `extensions/firewall` over USB.
-4. Delete `WIFI_NO_NET_PROBE` from the drive root and reboot, so the Kindle checks the internet connection normally again. (Optional — keeping it does no harm.)
+1. Firewall ▸ **Disable Firewall**, then **Remove Autostart**, and **Remove Airplane-on-Boot** if you installed it.
+2. Delete `extensions/firewall` over USB.
+3. Delete `WIFI_NO_NET_PROBE` from the drive root and reboot, so the Kindle checks the internet connection normally again. (Optional — keeping it does no harm.)
 
 ## Customizing for your Kindle with AI
 
@@ -230,7 +226,7 @@ My changes: <describe what you want, e.g. "my home network is 10.0.0.x", or "not
 
 ### Step 3 — Install the result
 
-Replace `extensions/firewall` on your Kindle with the new folder (keep `WIFI_NO_NET_PROBE` at the root), reboot if anything about Wi-Fi changed, then run through [Checking that it works](#checking-that-it-works) again. If you used Autostart before and the AI changed the boot job, press **Remove Autostart** with the old version first, then **Install Autostart** with the new one.
+Replace `extensions/firewall` on your Kindle with the new folder (keep `WIFI_NO_NET_PROBE` at the root), reboot if anything about Wi-Fi changed, then run through [Checking that it works](#checking-that-it-works) again. Press **Enable Firewall** once: it also rewrites the boot job if the AI changed it.
 
 ## Notes for AI
 
