@@ -6,7 +6,10 @@ A KUAL extension for jailbroken Kindles. It blocks all outbound internet traffic
 
 - your local network (`192.168.x.x`, `10.x.x.x`, `172.16–31.x.x`)
 - DNS lookups
-- KOReader's own update servers and dictionary download sites (so KOReader can still update itself and download dictionaries) — see [Why these sites are allowed](#why-these-sites-are-allowed)
+- KOReader's own update servers and dictionary download sites (so KOReader can still update itself and download dictionaries)
+- time sync (NTP) and the calibre discovery broadcast, for the companion extension [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless)
+
+The full list and the reason for each is in [What exactly is allowed](#what-exactly-is-allowed).
 
 It can also start automatically on boot, so the firewall is active before Wi-Fi and the OTA service start.
 
@@ -100,21 +103,21 @@ Firewall ▸
 
 ## What exactly is allowed
 
-| Allowed | Notes |
+| Allowed | Why |
 | --- | --- |
 | Loopback (`lo`) | Internal communication between programs on the Kindle |
 | `192.168.0.0/16`, `10.0.0.0/8`, `172.16.0.0/12` | Your local network, any port. These three private ranges (RFC 1918) are never routed on the internet, so no Amazon server can be in them. Not allowed: `100.64.0.0/10` (carrier-grade NAT, outside your home), `169.254.0.0/16` (only appears when DHCP fails), multicast. |
-| DNS (port 53) | To any DNS server |
-| NTP (UDP port 123) | To any time server. Lets [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) set the Kindle's clock from `pool.ntp.org` (volunteer time servers, not Amazon). Open to any host because `pool.ntp.org` gives different IPs on every lookup. NTP only carries the time, so this doesn't open a path for firmware updates. |
-| HTTP and HTTPS to the KOReader-related sites listed in [Why these sites are allowed](#why-these-sites-are-allowed) | IPs looked up after you press Enable |
-| UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So a calibre wireless-connection plugin on the Kindle can find calibre on your computer. See [Why these sites are allowed](#why-these-sites-are-allowed). |
-| Replies to allowed connections | |
+| DNS (port 53) | To any DNS server. Needed to look up the allowed sites below. |
+| NTP (UDP port 123) | To any time server. Lets [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) set the Kindle's clock from `pool.ntp.org` (volunteer time servers, not Amazon). Open to any host because `pool.ntp.org` gives different IPs on every lookup. NTP only carries the time, so this doesn't open a path for firmware updates. Source: same method as KOReader's time-sync plugin (`ntpdate pool.ntp.org`, `plugins/timesync.koplugin`). |
+| HTTP and HTTPS (ports 80, 443) to KOReader's update and dictionary sites | So KOReader can update itself and download dictionaries. The IPs are looked up each time Wi-Fi connects. The list of sites and where each comes from: [KOReader sites](#koreader-sites). |
+| UDP broadcast to `255.255.255.255`, ports `54982 48123 39001 44044 59678` | So [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) can find calibre on your computer. The broadcast never leaves your local network. Source: the UNCaGED library hard-codes `255.255.255.255` (`calibre/calibre.go`); the ports are calibre's `BROADCAST_PORTS` (`src/calibre/devices/smart_device_app/driver.py`). calibre's reply comes **in** (INPUT), which this firewall does not filter; the TCP connection to calibre goes to your local network, already allowed. |
+| Replies to allowed connections | So answers to what the Kindle sent can come back |
 
 Everything else outbound is dropped.
 
-## Why these sites are allowed
+## KOReader sites
 
-The goal is: **block Amazon (firmware updates, phoning home), but keep KOReader fully usable** — its built-in updater and its built-in dictionary downloader. These are the hosts KOReader actually contacts, taken from KOReader's own source code and checked on 2026-11-04:
+The details of the "KOReader's update and dictionary sites" row above. The goal is: **block Amazon (firmware updates, phoning home), but keep KOReader fully usable** — its built-in updater and its built-in dictionary downloader. These are the hosts KOReader actually contacts, taken from KOReader's own source code and checked on 2026-11-04:
 
 | Host | Port | Needed for | Source / how verified |
 | --- | --- | --- | --- |
@@ -127,7 +130,6 @@ The goal is: **block Amazon (firmware updates, phoning home), but keep KOReader 
 | `api.github.com` | 443 | Kept from earlier versions (GitHub API) | — |
 | `cyphar.github.io` | 443 | Japanese dictionaries (JMdict, JMnedict) | dictionaries.lua; no redirect |
 | `build.koreader.rocks` | 80 | A few dictionaries (CIA Factbook, GCIDE, Pape) | dictionaries.lua; no redirect |
-| UDP broadcast `255.255.255.255` (not a site) | 54982, 48123, 39001, 44044, 59678 | Finding calibre on the local network for wireless book transfer (for the companion extension [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless)). The broadcast never leaves your local network. | The UNCaGED library hard-codes the target `255.255.255.255` (`calibre/calibre.go`); the ports are calibre's `BROADCAST_PORTS` (`src/calibre/devices/smart_device_app/driver.py`). calibre's reply comes **in** (INPUT), which this firewall does not filter; the TCP connection to calibre goes to `192.168.x.x`, already allowed. |
 
 Both ports 80 and 443 are opened for every host above (KOReader OTA uses plain `http://`, most dictionaries use `https://`).
 

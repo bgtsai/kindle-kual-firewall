@@ -6,7 +6,10 @@
 
 - 區域網路（`192.168.x.x`、`10.x.x.x`、`172.16～31.x.x`）
 - DNS 查詢
-- KOReader 自己的更新伺服器與字典下載網站（讓 KOReader 照樣能自我更新、下載字典），見[為什麼放行這些網站](#為什麼放行這些網站)
+- KOReader 自己的更新伺服器與字典下載網站（讓 KOReader 照樣能自我更新、下載字典）
+- 網路對時（NTP）與 calibre 的搜尋廣播，給配套插件 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) 用
+
+完整清單與每一項的理由見[到底放行了哪些](#到底放行了哪些)。
 
 也可以設定成開機自動啟用，讓防火牆比 Wi-Fi 與 OTA 服務更早生效。
 
@@ -100,21 +103,21 @@ Firewall ▸
 
 ## 到底放行了哪些
 
-| 放行 | 說明 |
+| 放行 | 為什麼 |
 | --- | --- |
 | 本機（`lo`） | Kindle 內部程式之間的溝通 |
 | `192.168.0.0/16`、`10.0.0.0/8`、`172.16.0.0/12` | 區域網路，所有埠。這三段是私有網段（RFC 1918），網際網路上不會被路由，不可能是 Amazon 的伺服器。沒有放行：`100.64.0.0/10`（電信業者 CGNAT，不在你家）、`169.254.0.0/16`（DHCP 失敗時才出現）、群播。 |
-| DNS（53 埠） | 任何 DNS 伺服器 |
-| NTP（UDP 123 埠） | 任何時間伺服器。讓 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) 用 `pool.ntp.org`（志願者維護的時間伺服器，不是 Amazon）校正 Kindle 時鐘。不限主機，因為 `pool.ntp.org` 每次查到的 IP 都不同。NTP 只傳時間，不會成為韌體更新的管道。 |
-| 連到 KOReader 相關網站的 HTTP 與 HTTPS，清單見[為什麼放行這些網站](#為什麼放行這些網站) | 按下 Enable 後查到的 IP |
-| UDP 廣播到 `255.255.255.255`，埠 `54982 48123 39001 44044 59678` | 讓 Kindle 上的 calibre 無線連線插件找得到電腦上的 calibre，見[為什麼放行這些網站](#為什麼放行這些網站)。 |
-| 已放行連線的回應 | |
+| DNS（53 埠） | 任何 DNS 伺服器。查下面放行網站的 IP 要用到。 |
+| NTP（UDP 123 埠） | 任何時間伺服器。讓 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) 用 `pool.ntp.org`（志願者維護的時間伺服器，不是 Amazon）校正 Kindle 時鐘。不限主機，因為 `pool.ntp.org` 每次查到的 IP 都不同。NTP 只傳時間，不會成為韌體更新的管道。出處：做法同 KOReader 的對時外掛（`ntpdate pool.ntp.org`，`plugins/timesync.koplugin`）。 |
+| 連到 KOReader 更新與字典網站的 HTTP、HTTPS（80、443 埠） | 讓 KOReader 能自我更新、下載字典。每次連上 Wi-Fi 重新查 IP。網站清單與各自的出處見 [KOReader 的網站](#koreader-的網站)。 |
+| UDP 廣播到 `255.255.255.255`，埠 `54982 48123 39001 44044 59678` | 讓 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless) 找得到電腦上的 calibre。廣播不會離開你家的區域網路。出處：UNCaGED 函式庫把目標寫死成 `255.255.255.255`（`calibre/calibre.go`）；埠號是 calibre 的 `BROADCAST_PORTS`（`src/calibre/devices/smart_device_app/driver.py`）。calibre 的回覆是**送進來**的方向（INPUT），這個防火牆不管；連到 calibre 的 TCP 目標在區域網路裡，本來就放行。 |
+| 已放行連線的回應 | 讓 Kindle 送出去的請求能收到回覆 |
 
 其他所有對外流量都擋掉。
 
-## 為什麼放行這些網站
+## KOReader 的網站
 
-目標是：**擋掉 Amazon（韌體更新、回傳資料），但 KOReader 要能完整使用**，包括它內建的更新功能和內建的字典下載。下面是 KOReader 實際會連的主機，取自 KOReader 自己的原始碼，2026-11-04 查證：
+上表「KOReader 更新與字典網站」那一列的細節。目標是：**擋掉 Amazon（韌體更新、回傳資料），但 KOReader 要能完整使用**，包括它內建的更新功能和內建的字典下載。下面是 KOReader 實際會連的主機，取自 KOReader 自己的原始碼，2026-11-04 查證：
 
 | 主機 | 埠 | 用途 | 來源／怎麼查證的 |
 | --- | --- | --- | --- |
@@ -127,7 +130,6 @@ Firewall ▸
 | `api.github.com` | 443 | 舊版留下的（GitHub API） | — |
 | `cyphar.github.io` | 443 | 日文字典（JMdict、JMnedict） | dictionaries.lua；不轉址 |
 | `build.koreader.rocks` | 80 | 少數幾本字典（CIA Factbook、GCIDE、Pape） | dictionaries.lua；不轉址 |
-| UDP 廣播 `255.255.255.255`（不是網站） | 54982、48123、39001、44044、59678 | 在區域網路上找 calibre，用來無線傳書（給配套插件 [kindle-kual-calibre-wireless](https://github.com/bgtsai/kindle-kual-calibre-wireless)）。廣播不會離開你家的區域網路。 | UNCaGED 函式庫把目標寫死成 `255.255.255.255`（`calibre/calibre.go`）；埠號是 calibre 的 `BROADCAST_PORTS`（`src/calibre/devices/smart_device_app/driver.py`）。calibre 的回覆是**送進來**的方向（INPUT），這個防火牆不管；連到 calibre 的 TCP 目標是 `192.168.x.x`，本來就放行。 |
 
 上面每個主機都同時放行 80 和 443 埠（KOReader OTA 用 `http://`，大部分字典用 `https://`）。
 
