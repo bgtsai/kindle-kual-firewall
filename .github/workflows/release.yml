@@ -41,6 +41,8 @@ jobs:
         if: steps.check.outputs.exists != '1'
         run: |
           chmod 755 kindle/extensions/firewall/bin/*.sh
+          # MIT 要求散布的副本附授權文字
+          cp LICENSE kindle/extensions/firewall/LICENSE
           cd kindle && zip -r ../firewall.zip extensions WIFI_NO_NET_PROBE
 
       - name: Create release
